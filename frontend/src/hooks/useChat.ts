@@ -1,7 +1,9 @@
-import { useEffect, useCallback, useRef } from 'react'
+import { useEffect, useCallback } from 'react'
 import useChatStore from '../store/chatStore'
+import useSettingsStore from '../store/settingsStore'
 import { SSEEvent } from '../types'
 import { chatApi, sessionApi } from '../services/api'
+import { message } from 'antd'
 
 export const useChat = () => {
   const {
@@ -9,18 +11,20 @@ export const useChat = () => {
     messages,
     isLoading,
     currentStreamingMessage,
+    currentThought,
     toolSteps,
     setSessionId,
     addMessage,
-    clearMessages,
+    clearMessages: storeClearMessages,
     setLoading,
     setCurrentStreamingMessage,
+    setCurrentThought,
     appendToStreamingMessage,
     addToolStep,
     clearToolSteps,
   } = useChatStore()
 
-  const eventSourceRef = useRef<EventSource | null>(null)
+  const useStreamingChat = useSettingsStore((state) => state.useStreamingChat)
 
   const sendMessage = useCallback(
     async (message: string) => {
@@ -40,10 +44,11 @@ export const useChat = () => {
 
       setLoading(true)
       setCurrentStreamingMessage('')
+      setCurrentThought('')
       clearToolSteps()
 
       try {
-        const response = await chatApi.send(sessionId, message)
+        const response = await chatApi.send(sessionId, message, useStreamingChat)
 
         if (!response) {
           throw new Error('No response body')
@@ -68,6 +73,13 @@ export const useChat = () => {
 
                 switch (data.type) {
                   case 'message':
+                    appendToStreamingMessage(data.content || '')
+                    break
+                  case 'thought':
+                    setCurrentThought(data.content || '')
+                    break
+                  case 'stream_chunk':
+                    // For raw streaming, append the content directly
                     appendToStreamingMessage(data.content || '')
                     break
                   case 'tool_start':
@@ -114,6 +126,7 @@ export const useChat = () => {
                       })
                     }
                     setCurrentStreamingMessage('')
+                    setCurrentThought('')
                     clearToolSteps()
                     setLoading(false)
                     break
@@ -138,16 +151,33 @@ export const useChat = () => {
       messages,
       currentStreamingMessage,
       toolSteps,
+      useStreamingChat,
       setSessionId,
       addMessage,
-      clearMessages,
       setLoading,
       setCurrentStreamingMessage,
+      setCurrentThought,
       appendToStreamingMessage,
       addToolStep,
       clearToolSteps,
     ]
   )
+
+  const clearMessages = useCallback(async () => {
+    if (!sessionId) return
+
+    try {
+      await sessionApi.clear(sessionId)
+      storeClearMessages()
+      setCurrentStreamingMessage('')
+      setCurrentThought('')
+      clearToolSteps()
+      message.success('已清空对话')
+    } catch (error) {
+      console.error('Failed to clear messages:', error)
+      message.error('清空失败')
+    }
+  }, [sessionId, storeClearMessages, setCurrentStreamingMessage, setCurrentThought, clearToolSteps])
 
   const initializeSession = useCallback(async () => {
     const newSession = await sessionApi.create('default')
@@ -165,8 +195,10 @@ export const useChat = () => {
     messages,
     isLoading,
     currentStreamingMessage,
+    currentThought,
     toolSteps,
     sendMessage,
+    clearMessages,
     initializeSession,
   }
 }

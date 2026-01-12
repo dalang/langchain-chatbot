@@ -8,6 +8,7 @@ interface ChatStore extends ChatState {
   setLoading: (loading: boolean) => void
   setCurrentStreamingMessage: (message: string) => void
   appendToStreamingMessage: (text: string) => void
+  setCurrentThought: (thought: string) => void
   addToolStep: (step: ToolStep) => void
   clearToolSteps: () => void
 }
@@ -17,6 +18,7 @@ const useChatStore = create<ChatStore>((set) => ({
   messages: [],
   isLoading: false,
   currentStreamingMessage: '',
+  currentThought: '',
   toolSteps: [],
 
   setSessionId: (id) => set({ sessionId: id }),
@@ -37,6 +39,9 @@ const useChatStore = create<ChatStore>((set) => ({
     set((state) => ({
       currentStreamingMessage: state.currentStreamingMessage + text,
     })),
+
+  setCurrentThought: (thought) =>
+    set({ currentThought: thought }),
 
   addToolStep: (step) =>
     set((state) => ({

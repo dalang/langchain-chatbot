@@ -39,11 +39,12 @@ export interface ChatState {
   messages: Message[]
   isLoading: boolean
   currentStreamingMessage: string
+  currentThought: string
   toolSteps: ToolStep[]
 }
 
 export interface SSEEvent {
-  type: 'message' | 'tool_start' | 'tool_result' | 'done' | 'error'
+  type: 'message' | 'stream_chunk' | 'thought' | 'tool_start' | 'tool_result' | 'done' | 'error'
   content?: string
   tool?: string
   input?: Record<string, any>

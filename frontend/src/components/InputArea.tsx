@@ -4,10 +4,11 @@ import { SendOutlined, ClearOutlined } from '@ant-design/icons'
 
 interface InputAreaProps {
   onSend: (message: string) => void
+  onClear: () => void
   isLoading: boolean
 }
 
-const InputArea: React.FC<InputAreaProps> = ({ onSend, isLoading }) => {
+const InputArea: React.FC<InputAreaProps> = ({ onSend, onClear, isLoading }) => {
   const [inputValue, setInputValue] = useState('')
 
   const handleSend = () => {
@@ -43,7 +44,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSend, isLoading }) => {
           style={{ flex: 1 }}
         />
         <Space>
-          <Button icon={<ClearOutlined />} disabled={isLoading}>
+          <Button icon={<ClearOutlined />} onClick={onClear} disabled={isLoading}>
             清空
           </Button>
           <Button

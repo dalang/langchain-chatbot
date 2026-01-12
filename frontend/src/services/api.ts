@@ -46,8 +46,13 @@ export const sessionApi = {
 }
 
 export const chatApi = {
-  send: async (sessionId: string, message: string) => {
-    const response = await fetch('/api/chat', {
+  send: async (
+    sessionId: string,
+    message: string,
+    useStreaming: boolean = false
+  ) => {
+    const endpoint = useStreaming ? '/api/stream-chat' : '/api/chat'
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
