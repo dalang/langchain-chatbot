@@ -13,6 +13,9 @@ export interface Message {
   session_id: string
   role: 'user' | 'assistant' | 'system' | 'tool'
   content: string | null
+  thought: string | null
+  thought_duration_ms: number | null
+  thought_start_time: number | null
   tool_calls: Record<string, any> | null
   created_at: string
   model: string | null

@@ -1,7 +1,7 @@
 import { useEffect, useCallback } from 'react'
 import useChatStore from '../store/chatStore'
 import useSettingsStore from '../store/settingsStore'
-import { SSEEvent } from '../types'
+import { SSEEvent, ToolStep } from '../types'
 import { chatApi, sessionApi } from '../services/api'
 import { message } from 'antd'
 
@@ -11,17 +11,15 @@ export const useChat = () => {
     messages,
     isLoading,
     currentStreamingMessage,
-    currentThought,
-    toolSteps,
     setSessionId,
     addMessage,
     clearMessages: storeClearMessages,
     setLoading,
     setCurrentStreamingMessage,
-    setCurrentThought,
     appendToStreamingMessage,
-    addToolStep,
-    clearToolSteps,
+    updateLastAssistantMessage,
+    addToolStepToLastMessage,
+    completeStreamingMessage,
   } = useChatStore()
 
   const useStreamingChat = useSettingsStore((state) => state.useStreamingChat)
@@ -35,6 +33,24 @@ export const useChat = () => {
         session_id: sessionId,
         role: 'user',
         content: message,
+        thought: null,
+        thought_duration_ms: null,
+        thought_start_time: null,
+        tool_calls: null,
+        created_at: new Date().toISOString(),
+        model: null,
+        tokens_used: null,
+        tool_steps: [],
+      })
+
+      addMessage({
+        id: Date.now() + 1,
+        session_id: sessionId,
+        role: 'assistant',
+        content: null,
+        thought: null,
+        thought_duration_ms: null,
+        thought_start_time: Date.now(),
         tool_calls: null,
         created_at: new Date().toISOString(),
         model: null,
@@ -44,8 +60,6 @@ export const useChat = () => {
 
       setLoading(true)
       setCurrentStreamingMessage('')
-      setCurrentThought('')
-      clearToolSteps()
 
       try {
         const response = await chatApi.send(sessionId, message, useStreamingChat)
@@ -67,26 +81,25 @@ export const useChat = () => {
           for (const line of lines) {
             if (line.startsWith('data: ')) {
               try {
-                const data = JSON.parse(
-                  line.slice(6)
-                ) as SSEEvent
+                const data = JSON.parse(line.slice(6)) as SSEEvent
 
                 switch (data.type) {
                   case 'message':
                     appendToStreamingMessage(data.content || '')
                     break
                   case 'thought':
-                    setCurrentThought(data.content || '')
+                    updateLastAssistantMessage({
+                      thought: data.content || '',
+                    })
                     break
                   case 'stream_chunk':
-                    // For raw streaming, append the content directly
                     appendToStreamingMessage(data.content || '')
                     break
-                  case 'tool_start':
-                    addToolStep({
+                  case 'tool_start': {
+                    const step: ToolStep = {
                       id: Date.now(),
                       message_id: Date.now(),
-                      step_number: toolSteps.length + 1,
+                      step_number: 1,
                       tool_name: data.tool || '',
                       tool_input: data.input || {},
                       tool_output: null,
@@ -95,41 +108,39 @@ export const useChat = () => {
                       completed_at: null,
                       duration_ms: null,
                       status: 'running',
-                    })
+                    }
+                    addToolStepToLastMessage(step)
                     break
-                  case 'tool_result':
-                    if (toolSteps.length > 0) {
-                      const updatedStep = {
-                        ...toolSteps[toolSteps.length - 1],
+                  }
+                  case 'tool_result': {
+                    const messages = useChatStore.getState().messages
+                    const lastMsg = messages[messages.length - 1]
+                    if (lastMsg && lastMsg.tool_steps && lastMsg.tool_steps.length > 0) {
+                      const lastStep = lastMsg.tool_steps[lastMsg.tool_steps.length - 1]
+                      const updatedSteps = [...lastMsg.tool_steps]
+                      updatedSteps[updatedSteps.length - 1] = {
+                        ...lastStep,
                         tool_output: data.result || '',
                         completed_at: new Date().toISOString(),
                         duration_ms: data.duration_ms || 0,
                         status: 'completed',
                       }
-                      addToolStep(updatedStep)
+                      updateLastAssistantMessage({ tool_steps: updatedSteps })
                     }
                     break
-                  case 'done':
-                    // Get the latest streaming message content from store
-                    const finalMessage = useChatStore.getState().currentStreamingMessage
-                    if (finalMessage) {
-                      addMessage({
-                        id: Date.now(),
-                        session_id: sessionId,
-                        role: 'assistant',
-                        content: finalMessage,
-                        tool_calls: null,
-                        created_at: new Date().toISOString(),
-                        model: null,
-                        tokens_used: null,
-                        tool_steps: [],
+                  }
+                  case 'done': {
+                    const messages = useChatStore.getState().messages
+                    const lastMsg = messages[messages.length - 1]
+                    if (lastMsg && lastMsg.thought_start_time) {
+                      updateLastAssistantMessage({
+                        thought_duration_ms: Date.now() - lastMsg.thought_start_time,
                       })
                     }
-                    setCurrentStreamingMessage('')
-                    setCurrentThought('')
-                    clearToolSteps()
+                    completeStreamingMessage()
                     setLoading(false)
                     break
+                  }
                   case 'error':
                     console.error('Chat error:', data.message)
                     setLoading(false)
@@ -148,18 +159,14 @@ export const useChat = () => {
     },
     [
       sessionId,
-      messages,
-      currentStreamingMessage,
-      toolSteps,
       useStreamingChat,
-      setSessionId,
       addMessage,
       setLoading,
       setCurrentStreamingMessage,
-      setCurrentThought,
       appendToStreamingMessage,
-      addToolStep,
-      clearToolSteps,
+      updateLastAssistantMessage,
+      addToolStepToLastMessage,
+      completeStreamingMessage,
     ]
   )
 
@@ -170,14 +177,12 @@ export const useChat = () => {
       await sessionApi.clear(sessionId)
       storeClearMessages()
       setCurrentStreamingMessage('')
-      setCurrentThought('')
-      clearToolSteps()
       message.success('已清空对话')
     } catch (error) {
       console.error('Failed to clear messages:', error)
       message.error('清空失败')
     }
-  }, [sessionId, storeClearMessages, setCurrentStreamingMessage, setCurrentThought, clearToolSteps])
+  }, [sessionId, storeClearMessages, setCurrentStreamingMessage])
 
   const initializeSession = useCallback(async () => {
     const newSession = await sessionApi.create('default')
@@ -195,8 +200,6 @@ export const useChat = () => {
     messages,
     isLoading,
     currentStreamingMessage,
-    currentThought,
-    toolSteps,
     sendMessage,
     clearMessages,
     initializeSession,

@@ -3,7 +3,6 @@ import { Card, Flex } from 'antd'
 import { SettingOutlined } from '@ant-design/icons'
 import MessageList from './MessageList'
 import InputArea from './InputArea'
-import ToolDisplay from './ToolDisplay'
 import SettingsModal from './SettingsModal'
 import useChat from '../hooks/useChat'
 
@@ -12,8 +11,6 @@ const ChatContainer: React.FC = () => {
     messages,
     isLoading,
     currentStreamingMessage,
-    currentThought,
-    toolSteps,
     sendMessage,
     clearMessages,
   } = useChat()
@@ -47,10 +44,7 @@ const ChatContainer: React.FC = () => {
           <MessageList
             messages={messages}
             currentStreamingMessage={currentStreamingMessage}
-            currentThought={currentThought}
-            toolSteps={toolSteps}
           />
-          <ToolDisplay toolSteps={toolSteps} />
           <InputArea onSend={sendMessage} onClear={clearMessages} isLoading={isLoading} />
         </Flex>
       </Card>
