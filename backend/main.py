@@ -28,7 +28,7 @@ from backend.models import (
     MessageCreate,
     MessageResponse,
 )
-from backend.chatbot_engine import chat_async
+from backend.chatbot_engine import chat_async, chat_async_stream
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -204,6 +204,133 @@ async def chat_stream_generator(session_id: str, message: str, db: AsyncSession)
     except Exception as e:
         error_event = {"type": "error", "message": str(e)}
         yield f"data: {json.dumps(error_event)}\n\n"
+
+
+async def chat_stream_generator_raw(session_id: str, message: str, db: AsyncSession):
+    """Real streaming generator using chat_async_stream.
+
+    Parses and formats agent execution chunks for proper display.
+    """
+    try:
+        await MessageRepository.create(
+            db, session_id=session_id, role="user", content=message
+        )
+
+        full_output = ""
+        async for chunk in chat_async_stream(message):
+            # chunk is an AddableDict with keys like 'actions', 'steps', 'messages', 'output'
+
+            # Handle actions (agent starting to use a tool)
+            if "actions" in chunk and chunk["actions"]:
+                for action in chunk["actions"]:
+                    if hasattr(action, "tool"):
+                        # Extract tool name and input
+                        tool_name = action.tool
+                        tool_input = action.tool_input if hasattr(action, "tool_input") else {}
+
+                        # Send tool_start event
+                        tool_start = {
+                            "type": "tool_start",
+                            "tool": tool_name,
+                            "input": tool_input,
+                        }
+                        yield f"data: {json.dumps(tool_start)}\n\n"
+
+                        # Create tool step in database
+                        tool_step = await ToolStepRepository.create(
+                            db,
+                            message_id=0,  # Will update later
+                            step_number=1,
+                            tool_name=tool_name,
+                            tool_input=tool_input,
+                        )
+
+            # Handle steps (tool execution completed with observation)
+            if "steps" in chunk and chunk["steps"]:
+                for step in chunk["steps"]:
+                    if hasattr(step, "observation") and hasattr(step, "action"):
+                        observation = step.observation
+                        action = step.action
+
+                        # Format observation based on type
+                        if isinstance(observation, list):
+                            # Search results - format nicely
+                            obs_str = json.dumps(observation, ensure_ascii=False)
+                        else:
+                            obs_str = str(observation)
+
+                        # Send tool_result event
+                        tool_end = {
+                            "type": "tool_result",
+                            "result": obs_str,
+                            "duration_ms": 100,
+                        }
+                        yield f"data: {json.dumps(tool_end)}\n\n"
+
+            # Handle messages (agent's thought process)
+            if "messages" in chunk and chunk["messages"]:
+                for msg in chunk["messages"]:
+                    if hasattr(msg, "content"):
+                        content = msg.content
+                        # Parse the content for Thought/Action/Final Answer
+                        if isinstance(content, str):
+                            # Extract Thought
+                            if "Thought:" in content:
+                                thought_match = content.split("Thought:")[1].split("\n")[0].strip()
+                                thought_event = {"type": "thought", "content": thought_match}
+                                yield f"data: {json.dumps(thought_event)}\n\n"
+
+                            # Extract Final Answer
+                            if "Final Answer:" in content:
+                                final_answer = content.split("Final Answer:")[1].strip()
+                                # Stream final answer character by character
+                                for char in final_answer:
+                                    message_event = {"type": "message", "content": char}
+                                    yield f"data: {json.dumps(message_event)}\n\n"
+                                    await asyncio.sleep(0.01)
+
+            # Handle output (final result)
+            if "output" in chunk and chunk["output"]:
+                full_output = chunk["output"]
+                # Stream output character by character if not already streamed via messages
+                if full_output:
+                    for char in full_output:
+                        message_event = {"type": "message", "content": char}
+                        yield f"data: {json.dumps(message_event)}\n\n"
+                        await asyncio.sleep(0.01)
+
+        # Store final message in database
+        if full_output:
+            await MessageRepository.create(
+                db,
+                session_id=session_id,
+                role="assistant",
+                content=full_output,
+                model=settings.MODEL_NAME,
+            )
+
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        error_event = {"type": "error", "message": str(e)}
+        yield f"data: {json.dumps(error_event)}\n\n"
+
+
+@app.post("/api/stream-chat")
+async def stream_chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
+    """Real streaming chat endpoint using async_chat_stream."""
+    session = await SessionRepository.get_by_id(db, request.sessionId)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
+        )
+
+    return StreamingResponse(
+        chat_stream_generator_raw(request.sessionId, request.message, db),
+        media_type="text/event-stream",
+    )
 
 
 @app.post("/api/chat")
