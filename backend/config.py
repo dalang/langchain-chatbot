@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     ZHIPUAI_API_KEY: str
     TAVILY_API_KEY: str
     TAVILY_MAX_RESULTS: int = 3
+    LANGSMITH_API_KEY: str = ""
 
     DATABASE_URL: str = "sqlite+aiosqlite:///./data/chatbot.db"
 

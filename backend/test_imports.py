@@ -49,9 +49,9 @@ except Exception as e:
     print(f"  ❌ 失败: {e}")
     tests.append(False)
 
-print("测试 5: 导入 langchain.hub...")
+print("测试 5: 导入 langsmith.Client...")
 try:
-    from langchain import hub
+    from langsmith import Client
 
     print("  ✅ 成功")
     tests.append(True)

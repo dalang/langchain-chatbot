@@ -7,16 +7,17 @@ os.environ["TAVILY_API_KEY"] = settings.TAVILY_API_KEY
 
 from backend.tools.calculator import calculator
 from backend.tools.tavily_search import tavily_search
-from langchain import hub
 from langchain.agents import AgentExecutor, create_json_chat_agent
 from langchain_community.chat_models.zhipuai import ChatZhipuAI
 from langchain_core.tools import tool
+from langsmith import Client
 
 try:
-    prompt = hub.pull("hwchase17/react-chat-json")
+    client = Client(api_key=settings.LANGSMITH_API_KEY)
+    prompt = client.pull_prompt("hwchase17/react-chat-json")
 except Exception as e:
-    print(f"无法从 hub 获取 prompt: {e}")
-    print("请确保已安装 langchain-classic 并联网")
+    print(f"无法从 LangSmith 获取 prompt: {e}")
+    print("请确保已配置 LANGSMITH_API_KEY 并联网")
     raise
 
 tools = [calculator, tavily_search]
