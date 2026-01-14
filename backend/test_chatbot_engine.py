@@ -225,39 +225,56 @@ async def test_chat_async_stream_return_types(
 # ============================================================================
 
 
-@pytest.mark.integration
-@pytest.mark.asyncio
-async def test_chat_async_stream_real_llm_simple_question():
-    """Integration test: Real LLM streaming call with a simple question"""
-    # Clear executors cache to use real LLM
-    import backend.chatbot_engine
+async def _collect_stream_output(stream):
+    """Helper: Collect streaming chunks and extract final output.
 
-    backend.chatbot_engine.executors = {}
-
-    question = "What is the capital of China?"
-
-    # Collect all streaming chunks
+    Returns:
+        tuple: (chunks, final_output) where final_output is extracted from
+               either 'output' key or 'messages' with 'Final Answer:' marker.
+    """
     chunks = []
-    final_answer = None
+    final_output = None
 
-    async for chunk in chat_async_stream(question):
+    async for chunk in stream:
         chunks.append(chunk)
         print(
             f"Chunk type: {type(chunk)}, keys: {chunk.keys() if isinstance(chunk, dict) else 'N/A'}"
         )
 
-        # Extract final answer from messages in the chunk
+        # Extract output from 'output' key
+        if isinstance(chunk, dict) and "output" in chunk:
+            final_output = chunk["output"]
+
+        # Extract final answer from messages
         if isinstance(chunk, dict) and "messages" in chunk:
-            messages = chunk["messages"]
-            for msg in messages:
+            for msg in chunk["messages"]:
                 if hasattr(msg, "content"):
                     content = msg.content
-                    # Content might be a list or string
                     content_str = str(content) if isinstance(content, list) else content
-                    # Look for the final answer in the message content
                     if "Final Answer:" in content_str:
-                        final_answer = content_str
-                        print(f"Found answer: {final_answer}")
+                        final_output = content_str
+                        print(f"Found final answer: {final_output}")
+
+    return chunks, final_output
+
+
+@pytest.fixture
+def clear_executors_cache():
+    """Clear executors cache before each integration test"""
+    import backend.chatbot_engine
+
+    backend.chatbot_engine.executors = {}
+    yield
+    backend.chatbot_engine.executors = {}
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_chat_async_stream_real_llm_simple_question(clear_executors_cache):
+    """Integration test: Real LLM streaming call with a simple question"""
+    question = "What is the capital of China?"
+
+    chunks, final_answer = await _collect_stream_output(chat_async_stream(question))
 
     # Verify we received streaming chunks
     assert len(chunks) > 0, "Should receive at least one chunk"
@@ -273,37 +290,11 @@ async def test_chat_async_stream_real_llm_simple_question():
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_chat_async_stream_real_llm_with_calculator():
+async def test_chat_async_stream_real_llm_with_calculator(clear_executors_cache):
     """Integration test: Real LLM streaming call with calculator tool"""
-    import backend.chatbot_engine
-
-    backend.chatbot_engine.executors = {}
-
     question = "What is 123 * 456?"
 
-    # Collect all streaming chunks and find final output
-    final_output = None
-    chunks = []
-
-    async for chunk in chat_async_stream(question):
-        chunks.append(chunk)
-        print(
-            f"Chunk type: {type(chunk)}, keys: {chunk.keys() if isinstance(chunk, dict) else 'N/A'}"
-        )
-
-        # Extract output from chunk
-        if isinstance(chunk, dict) and "output" in chunk:
-            final_output = chunk["output"]
-
-        # Also check messages for Final Answer
-        if isinstance(chunk, dict) and "messages" in chunk:
-            for msg in chunk["messages"]:
-                if hasattr(msg, "content"):
-                    content = msg.content
-                    content_str = str(content) if isinstance(content, list) else content
-                    if "Final Answer:" in content_str:
-                        final_output = content_str.split("Final Answer:")[-1].strip()
-                        print(f"Found final answer: {final_output}")
+    chunks, final_output = await _collect_stream_output(chat_async_stream(question))
 
     # Verify we received streaming chunks
     assert len(chunks) > 0, "Should receive at least one chunk"
@@ -321,37 +312,11 @@ async def test_chat_async_stream_real_llm_with_calculator():
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_chat_async_stream_real_llm_with_search():
+async def test_chat_async_stream_real_llm_with_search(clear_executors_cache):
     """Integration test: Real LLM streaming call with tavily search tool"""
-    import backend.chatbot_engine
-
-    backend.chatbot_engine.executors = {}
-
     question = "What is the latest news about AI today?"
 
-    # Collect all streaming chunks and find final output
-    final_output = None
-    chunks = []
-
-    async for chunk in chat_async_stream(question):
-        chunks.append(chunk)
-        print(
-            f"Chunk type: {type(chunk)}, keys: {chunk.keys() if isinstance(chunk, dict) else 'N/A'}"
-        )
-
-        # Extract output from chunk
-        if isinstance(chunk, dict) and "output" in chunk:
-            final_output = chunk["output"]
-
-        # Also check messages for Final Answer
-        if isinstance(chunk, dict) and "messages" in chunk:
-            for msg in chunk["messages"]:
-                if hasattr(msg, "content"):
-                    content = msg.content
-                    content_str = str(content) if isinstance(content, list) else content
-                    if "Final Answer:" in content_str:
-                        final_output = content_str.split("Final Answer:")[-1].strip()
-                        print(f"Found final answer: {final_output}")
+    chunks, final_output = await _collect_stream_output(chat_async_stream(question))
 
     # Verify we received streaming chunks
     assert len(chunks) > 0, "Should receive at least one chunk"

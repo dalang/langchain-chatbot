@@ -32,6 +32,11 @@ dev = [
 start = "backend.main:app"
 dev = "backend.main:app --reload --host 127.0.0.1 --port 8000"
 
+[tool.pytest.ini_options]
+markers = [
+    "integration: marks tests as integration tests (real API calls)",
+]
+
 [tool.uv]
 dev-dependencies = [
     "pytest>=7.0.0",
