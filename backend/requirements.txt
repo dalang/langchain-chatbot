@@ -22,11 +22,11 @@ httpx-sse==0.4.3
 idna==3.11
 jsonpatch==1.33
 jsonpointer==3.0.0
-langchain==0.1.20
+langchain==1.2.7
 langchain-classic==1.0.1
 langchain-community==0.0.38
-langchain-core==0.1.53
-langchain-text-splitters==0.0.2
+# langchain-core version resolved automatically
+# langchain-text-splitters version resolved automatically
 langchainhub==0.1.21
 langgraph==1.0.5
 langgraph-checkpoint==3.0.1
