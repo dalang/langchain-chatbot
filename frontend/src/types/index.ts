@@ -55,3 +55,18 @@ export interface SSEEvent {
   duration_ms?: number
   message?: string
 }
+
+export interface ChatResponse {
+  output: string
+  intermediate_steps: any[]
+  tool_steps: ToolStepInfo[]
+  message: Message
+}
+
+export interface ToolStepInfo {
+  tool_name: string
+  tool_input: Record<string, any>
+  tool_output: string
+  duration_ms: number
+  status: string
+}

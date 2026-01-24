@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback, useMemo } from 'react'
+import React, { useEffect, useRef, useCallback, useMemo, memo, useTransition } from 'react'
 import { Bubble } from '@ant-design/x'
 import { Flex, Avatar, Button, Tooltip, message } from 'antd'
 import { UserOutlined, CopyOutlined } from '@ant-design/icons'
@@ -11,8 +11,151 @@ interface MessageListProps {
   currentStreamingMessage: string
 }
 
+const CopyButton = memo(({ content, onCopy }: { content: string; onCopy: (text: string) => void }) => (
+  <Tooltip title="复制">
+    <Button
+      type="text"
+      size="small"
+      icon={<CopyOutlined />}
+      onClick={() => onCopy(content)}
+      style={{
+        opacity: 0.5,
+        transition: 'opacity 0.2s',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.opacity = '1'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.opacity = '0.5'
+      }}
+    />
+  </Tooltip>
+))
+
+const MessageContent = memo(({ content, isStreaming }: { content: string; isStreaming?: boolean }) => {
+  if (isStreaming) {
+    return (
+      <div
+        style={{
+          fontSize: '14px',
+          lineHeight: '1.6',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+        }}
+      >
+        {content}
+        <span
+          style={{
+            display: 'inline-block',
+            width: '8px',
+            height: '18px',
+            backgroundColor: '#1890ff',
+            marginLeft: '4px',
+            animation: 'blink 1s infinite',
+            verticalAlign: 'text-bottom',
+            borderRadius: '2px',
+          }}
+        />
+        <style>{`
+          @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+          }
+        `}</style>
+      </div>
+    )
+  }
+
+  return (
+    <XMarkdown
+      style={{
+        fontSize: '14px',
+        lineHeight: '1.6',
+      }}
+    >
+      {content}
+    </XMarkdown>
+  )
+})
+
+const MessageItem = memo(({ message, aiStyles, userStyles, onCopy }: {
+  message: Message
+  aiStyles: any
+  userStyles: any
+  onCopy: (text: string) => void
+}) => {
+  const hasContent = message.content !== null && message.content !== undefined && message.content !== ''
+
+  return (
+    <Flex
+      vertical
+      gap="small"
+      align={message.role === 'user' ? 'flex-end' : 'flex-start'}
+    >
+      {message.role === 'assistant' && <ProcessDisplay key={`process-${message.id}`} message={message} />}
+
+      {hasContent && (
+        <Flex
+          gap="small"
+          align={message.role === 'user' ? 'flex-end' : 'flex-start'}
+          style={{
+            flexDirection: message.role === 'user' ? 'row-reverse' : 'row',
+          }}
+        >
+          {message.role === 'assistant' ? (
+            <div
+              style={{
+                ...aiStyles.content,
+                maxWidth: '600px',
+                wordBreak: 'break-word',
+              }}
+            >
+              <MessageContent content={message.content || ''} isStreaming={false} />
+            </div>
+          ) : (
+            <Bubble
+              role="user"
+              content={message.content || ''}
+              avatar={<Avatar icon={<UserOutlined />} style={{ backgroundColor: '#52c41a' }} />}
+              styles={userStyles}
+              placement="end"
+              variant="filled"
+            />
+          )}
+          {message.role === 'assistant' && <CopyButton content={message.content || ''} onCopy={onCopy} />}
+        </Flex>
+      )}
+    </Flex>
+  )
+})
+
+const StreamingMessageItem = memo(({ content, aiStyles, onCopy }: {
+  content: string
+  aiStyles: any
+  onCopy: (text: string) => void
+}) => (
+  <Flex vertical gap="small" align="flex-start">
+    <Flex gap="small" align="flex-start">
+      <div
+        style={{
+          ...aiStyles.content,
+          maxWidth: '600px',
+          wordBreak: 'break-word',
+        }}
+      >
+        <MessageContent content={content} isStreaming={true} />
+      </div>
+      <CopyButton content={content} onCopy={onCopy} />
+    </Flex>
+  </Flex>
+))
+
 const MessageList: React.FC<MessageListProps> = ({ messages, currentStreamingMessage }) => {
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [, startTransition] = useTransition()
+  const lastScrollHeightRef = useRef(0)
+
+  console.log('MessageList render:', { messagesCount: messages.length, hasStreaming: !!currentStreamingMessage })
 
   const handleCopy = useCallback(async (text: string) => {
     try {
@@ -56,81 +199,23 @@ const MessageList: React.FC<MessageListProps> = ({ messages, currentStreamingMes
     []
   )
 
-  const CopyButton = ({ content }: { content: string }) => (
-    <Tooltip title="复制">
-      <Button
-        type="text"
-        size="small"
-        icon={<CopyOutlined />}
-        onClick={() => handleCopy(content)}
-        style={{
-          opacity: 0.5,
-          transition: 'opacity 0.2s',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.opacity = '1'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.opacity = '0.5'
-        }}
-      />
-    </Tooltip>
-  )
-
-  const MessageContent = ({ content, isStreaming }: { content: string; isStreaming?: boolean }) => {
-    // 流式输出时：显示纯文本 + 打字机光标效果（避免markdown渲染导致的抖动）
-    // 输出完成后：显示完整的markdown渲染
-    if (isStreaming) {
-      return (
-        <div
-          style={{
-            fontSize: '14px',
-            lineHeight: '1.6',
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-          }}
-        >
-          {content}
-          <span
-            style={{
-              display: 'inline-block',
-              width: '8px',
-              height: '18px',
-              backgroundColor: '#1890ff',
-              marginLeft: '4px',
-              animation: 'blink 1s infinite',
-              verticalAlign: 'text-bottom',
-              borderRadius: '2px',
-            }}
-          />
-          <style>{`
-            @keyframes blink {
-              0%, 50% { opacity: 1; }
-              51%, 100% { opacity: 0; }
-            }
-          `}</style>
-        </div>
-      )
+  const scrollToBottom = useCallback(() => {
+    if (scrollRef.current) {
+      const newScrollHeight = scrollRef.current.scrollHeight
+      if (newScrollHeight !== lastScrollHeightRef.current) {
+        startTransition(() => {
+          if (scrollRef.current) {
+            scrollRef.current.scrollTop = newScrollHeight
+            lastScrollHeightRef.current = newScrollHeight
+          }
+        })
+      }
     }
-
-    // 非流式输出：使用完整的markdown渲染
-    return (
-      <XMarkdown
-        style={{
-          fontSize: '14px',
-          lineHeight: '1.6',
-        }}
-      >
-        {content}
-      </XMarkdown>
-    )
-  }
+  }, [])
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
-  }, [messages, currentStreamingMessage])
+    scrollToBottom()
+  }, [messages, currentStreamingMessage, scrollToBottom])
 
   return (
     <div
@@ -144,61 +229,21 @@ const MessageList: React.FC<MessageListProps> = ({ messages, currentStreamingMes
     >
       <Flex vertical gap="small">
         {messages.map((msg) => (
-          <Flex
+          <MessageItem
             key={msg.id}
-            vertical
-            gap="small"
-            align={msg.role === 'user' ? 'flex-end' : 'flex-start'}
-          >
-            {msg.role === 'assistant' && <ProcessDisplay key={`process-${msg.id}`} message={msg} />}
-
-            <Flex
-              gap="small"
-              align={msg.role === 'user' ? 'flex-end' : 'flex-start'}
-              style={{
-                flexDirection: msg.role === 'user' ? 'row-reverse' : 'row',
-              }}
-            >
-               {msg.role === 'assistant' ? (
-                 <div
-                   style={{
-                     ...aiStyles.content,
-                     maxWidth: '600px',
-                     wordBreak: 'break-word',
-                   }}
-                 >
-                   <MessageContent content={msg.content || ''} isStreaming={false} />
-                 </div>
-               ) : (
-                <Bubble
-                  role="user"
-                  content={msg.content || ''}
-                  avatar={<Avatar icon={<UserOutlined />} style={{ backgroundColor: '#52c41a' }} />}
-                  styles={userStyles}
-                  placement="end"
-                  variant="filled"
-                />
-              )}
-              {msg.role === 'assistant' && <CopyButton content={msg.content || ''} />}
-            </Flex>
-          </Flex>
+            message={msg}
+            aiStyles={aiStyles}
+            userStyles={userStyles}
+            onCopy={handleCopy}
+          />
         ))}
 
         {currentStreamingMessage && (
-          <Flex vertical gap="small" align="flex-start">
-            <Flex gap="small" align="flex-start">
-              <div
-                style={{
-                  ...aiStyles.content,
-                  maxWidth: '600px',
-                  wordBreak: 'break-word',
-                }}
-              >
-                <MessageContent content={currentStreamingMessage} isStreaming={true} />
-              </div>
-              <CopyButton content={currentStreamingMessage} />
-            </Flex>
-          </Flex>
+          <StreamingMessageItem
+            content={currentStreamingMessage}
+            aiStyles={aiStyles}
+            onCopy={handleCopy}
+          />
         )}
       </Flex>
     </div>

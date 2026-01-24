@@ -6,6 +6,8 @@ interface ChatStore {
   messages: Message[]
   isLoading: boolean
   currentStreamingMessage: string
+  _pendingStreamingText: string // 待更新的文本缓冲区
+  _rafId: number | null // requestAnimationFrame ID
   setSessionId: (id: string) => void
   addMessage: (message: Message) => void
   updateLastAssistantMessage: (updates: Partial<Message>) => void
@@ -17,11 +19,13 @@ interface ChatStore {
   completeStreamingMessage: () => void
 }
 
-const useChatStore = create<ChatStore>((set) => ({
+const useChatStore = create<ChatStore>((set, get) => ({
   sessionId: '',
   messages: [],
   isLoading: false,
   currentStreamingMessage: '',
+  _pendingStreamingText: '',
+  _rafId: null,
 
   setSessionId: (id) => set({ sessionId: id }),
 
@@ -49,13 +53,38 @@ const useChatStore = create<ChatStore>((set) => ({
 
   setLoading: (loading) => set({ isLoading: loading }),
 
-  setCurrentStreamingMessage: (message) =>
-    set({ currentStreamingMessage: message }),
+  setCurrentStreamingMessage: (message) => {
+    // 清除待处理的 RAF 更新
+    const state = get()
+    if (state._rafId !== null) {
+      cancelAnimationFrame(state._rafId)
+    }
+    set({ currentStreamingMessage: message, _pendingStreamingText: '', _rafId: null })
+  },
 
-  appendToStreamingMessage: (text) =>
-    set((state) => ({
-      currentStreamingMessage: state.currentStreamingMessage + text,
-    })),
+  appendToStreamingMessage: (text) => {
+    const state = get()
+
+    const newPendingText = state._pendingStreamingText + text
+
+    if (state._rafId !== null) {
+      set({ _pendingStreamingText: newPendingText })
+      return
+    }
+
+    const newRafId = requestAnimationFrame(() => {
+      const currentState = get()
+      if (currentState._pendingStreamingText) {
+        set((prev) => ({
+          currentStreamingMessage: prev.currentStreamingMessage + currentState._pendingStreamingText,
+          _pendingStreamingText: '',
+          _rafId: null,
+        }))
+      }
+    })
+
+    set({ _pendingStreamingText: newPendingText, _rafId: newRafId })
+  },
 
   addToolStepToLastMessage: (step) =>
     set((state) => {
@@ -64,9 +93,11 @@ const useChatStore = create<ChatStore>((set) => ({
         const isAssistant = msg.role === 'assistant'
 
         if (isLastMessage && isAssistant) {
+          const newToolSteps = [...(msg.tool_steps || []), step]
+          console.log('Adding tool step to message:', { messageId: msg.id, step, newToolSteps })
           return {
             ...msg,
-            tool_steps: [...(msg.tool_steps || []), step],
+            tool_steps: newToolSteps,
           }
         }
 
@@ -75,19 +106,26 @@ const useChatStore = create<ChatStore>((set) => ({
       return { messages: newMessages }
     }),
 
-  completeStreamingMessage: () =>
-    set((state) => {
-      if (!state.currentStreamingMessage) return state
-      const newMessages = [...state.messages]
+  completeStreamingMessage: () => {
+    const state = get()
+    // 清除待处理的 RAF 更新
+    if (state._rafId !== null) {
+      cancelAnimationFrame(state._rafId)
+    }
+
+    set((prevState) => {
+      if (!prevState.currentStreamingMessage) return { _rafId: null }
+      const newMessages = [...prevState.messages]
       const lastIndex = newMessages.length - 1
       if (lastIndex >= 0 && newMessages[lastIndex].role === 'assistant') {
         newMessages[lastIndex] = {
           ...newMessages[lastIndex],
-          content: state.currentStreamingMessage,
+          content: prevState.currentStreamingMessage,
         }
       }
-      return { messages: newMessages, currentStreamingMessage: '' }
-    }),
+      return { messages: newMessages, currentStreamingMessage: '', _pendingStreamingText: '', _rafId: null }
+    })
+  },
 }))
 
 export default useChatStore

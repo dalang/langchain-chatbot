@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { Session, Message } from '../types'
+import { Session, Message, ChatResponse } from '../types'
 
 const api = axios.create({
   baseURL: '/api',
@@ -50,19 +50,28 @@ export const chatApi = {
     sessionId: string,
     message: string,
     useStreaming: boolean = false
-  ) => {
+  ): Promise<ReadableStream<Uint8Array> | ChatResponse> => {
     const endpoint = useStreaming ? '/api/stream-chat' : '/api/chat'
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+
+    if (useStreaming) {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sessionId,
+          message,
+        }),
+      })
+      return response.body!
+    } else {
+      const response = await axios.post<ChatResponse>(endpoint, {
         sessionId,
         message,
-      }),
-    })
-    return response.body
+      })
+      return response.data
+    }
   },
 }
 
