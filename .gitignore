@@ -12,3 +12,7 @@ dist/
 node_modules/
 .DS_Store
 *.log
+.worktrees/
+.claude/
+.zed/
+uv.lock
