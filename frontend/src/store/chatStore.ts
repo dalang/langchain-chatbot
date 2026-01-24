@@ -107,23 +107,33 @@ const useChatStore = create<ChatStore>((set, get) => ({
     }),
 
   completeStreamingMessage: () => {
-    const state = get()
-    // 清除待处理的 RAF 更新
-    if (state._rafId !== null) {
-      cancelAnimationFrame(state._rafId)
-    }
-
     set((prevState) => {
-      if (!prevState.currentStreamingMessage) return { _rafId: null }
+      // 清除待处理的 RAF 更新
+      if (prevState._rafId !== null) {
+        cancelAnimationFrame(prevState._rafId)
+      }
+
+      // 将待处理文本合并到当前流式消息中
+      const finalStreamingContent =
+        prevState.currentStreamingMessage + prevState._pendingStreamingText
+
+      if (!finalStreamingContent) return { _rafId: null }
+
       const newMessages = [...prevState.messages]
       const lastIndex = newMessages.length - 1
       if (lastIndex >= 0 && newMessages[lastIndex].role === 'assistant') {
         newMessages[lastIndex] = {
           ...newMessages[lastIndex],
-          content: prevState.currentStreamingMessage,
+          content: finalStreamingContent,
         }
       }
-      return { messages: newMessages, currentStreamingMessage: '', _pendingStreamingText: '', _rafId: null }
+
+      return {
+        messages: newMessages,
+        currentStreamingMessage: '',
+        _pendingStreamingText: '',
+        _rafId: null,
+      }
     })
   },
 }))
