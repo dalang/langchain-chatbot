@@ -72,4 +72,13 @@ class ToolStepResponse(BaseModel):
         from_attributes = True
 
 
+class ChatResponse(BaseModel):
+    """Response model for non-streaming chat endpoint."""
+
+    output: str
+    intermediate_steps: List[Dict[str, Any]] = []
+    tool_steps: List[ToolStepResponse] = []
+    message: MessageResponse
+
+
 MessageResponse.model_rebuild()
