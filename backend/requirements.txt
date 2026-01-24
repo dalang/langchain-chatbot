@@ -25,7 +25,6 @@ jsonpointer==3.0.0
 langchain==1.2.7
 langchain-classic==1.0.1
 langchain-community==0.0.38
-# langchain-core version resolved automatically
 # langchain-text-splitters version resolved automatically
 langchainhub==0.1.21
 langgraph==1.0.5
