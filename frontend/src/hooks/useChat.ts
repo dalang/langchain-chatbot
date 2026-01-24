@@ -23,6 +23,7 @@ export const useChat = () => {
   } = useChatStore()
 
   const useStreamingChat = useSettingsStore((state) => state.useStreamingChat)
+  const enableToolCalls = useSettingsStore((state) => state.enableToolCalls)
 
   const sendMessage = useCallback(
     async (message: string) => {
@@ -62,7 +63,12 @@ export const useChat = () => {
       setCurrentStreamingMessage('')
 
       try {
-        const response = await chatApi.send(sessionId, message, useStreamingChat)
+        const response = await chatApi.send(
+          sessionId,
+          message,
+          useStreamingChat,
+          enableToolCalls
+        )
 
         if (!response) {
           throw new Error('No response body')

@@ -31,6 +31,7 @@ async def chat_stream_generator(
     session_id: str,
     message: str,
     db: AsyncSession,
+    enable_tools: bool = True,
 ) -> AsyncGenerator[str, None]:
     """Stream chat responses while emitting structured SSE events."""
     try:
@@ -42,7 +43,7 @@ async def chat_stream_generator(
         )
 
         full_output = ""
-        async for chunk in chat_async_stream(message):
+        async for chunk in chat_async_stream(message, enable_tools=enable_tools):
             if not isinstance(chunk, dict):
                 continue
 
@@ -127,6 +128,7 @@ async def chat_generator(
     session_id: str,
     message: str,
     db: AsyncSession,
+    enable_tools: bool = True,
 ) -> ChatResponse:
     """Generate chat response for non-streaming endpoint.
 
@@ -146,7 +148,7 @@ async def chat_generator(
         content=message,
     )
 
-    result = await chat_async(message)
+    result = await chat_async(message, enable_tools=enable_tools)
 
     assistant_message = await MessageRepository.create(
         db,

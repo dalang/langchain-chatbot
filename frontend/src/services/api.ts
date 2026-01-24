@@ -56,7 +56,8 @@ export const chatApi = {
   send: async (
     sessionId: string,
     message: string,
-    useStreaming: boolean = false
+    useStreaming: boolean = false,
+    enableToolCalls: boolean = true
   ): Promise<ReadableStream<Uint8Array> | ChatResponse> => {
     const endpoint = useStreaming ? '/api/stream-chat' : '/api/chat'
 
@@ -69,6 +70,7 @@ export const chatApi = {
         body: JSON.stringify({
           sessionId,
           message,
+          options: { enableToolCalls },
         }),
       })
       return response.body!
@@ -76,6 +78,7 @@ export const chatApi = {
       const response = await axios.post<ChatResponse>(endpoint, {
         sessionId,
         message,
+        options: { enableToolCalls },
       })
       return response.data
     }
