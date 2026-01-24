@@ -3,5 +3,4 @@ from langchain_community.tools.tavily_search import TavilySearchResults
 
 tavily_search = TavilySearchResults(
     max_results=settings.TAVILY_MAX_RESULTS,
-    tavily_api_key=settings.TAVILY_API_KEY,
 )
