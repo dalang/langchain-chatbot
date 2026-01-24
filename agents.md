@@ -2,18 +2,21 @@
 
 ## 项目概述
 
-本项目实现一个基于 LangChain 和智谱 AI 的网页版聊天机器人，支持工具调用、流式响应和会话持久化。
+本项目实现一个基于 LangChain 和智谱 AI 的网页版聊天机器人，支持工具调用、流式响应、非流式响应和会话持久化。
 
 ### 核心特性
 - ✅ 前端：React + Ant Design X
 - ✅ 后端：FastAPI + LangChain
-- ✅ 流式响应：SSE（Server-Sent Events）实现打字机效果
+- ✅ 双模式响应：SSE 流式 + 非流式响应
 - ✅ 数据库：SQLite + aiosqlite 异步存储
 - ✅ 工具支持：计算器、Tavily 搜索
 - ✅ 会话管理：支持多会话持久化
+- ✅ 思考过程展示：显示 Agent 的推理步骤
+- ✅ 性能优化：RAF 批量更新、memo 组件、useTransition
 
 ### 参考文件
 - `demo_zhipu.py` - 命令行版本的聊天机器人实现
+- `chat_service.py` - 聊天服务层（封装流式和非流式逻辑）
 
 ---
 
@@ -25,9 +28,14 @@
 │           FastAPI Server                │
 ├─────────────────────────────────────────┤
 │  ┌──────────┐  ┌──────────┐  ┌────────┐ │
-│  │ API Routes│→ │ Chatbot  │→ │Tools   │ │
-│  │   (SSE)  │  │ Engine   │  │        │ │
+│  │ API Routes│→ │Chat      │→ │Tools   │ │
+│  │   (SSE)  │  │Service   │  │        │ │
 │  └──────────┘  └──────────┘  └────────┘ │
+│                      ↓                  │
+│              ┌──────────────┐          │
+│              │  Chatbot     │          │
+│              │  Engine      │          │
+│              └──────────────┘          │
 │                      ↓                  │
 │              ┌──────────────┐          │
 │              │  SQLite DB    │          │
@@ -48,6 +56,10 @@
 │  │MessageList   │  ┌─────────────────┐ │
 │  ├──────────────┤  │ Context Store    │ │
 │  │InputArea     │← │ (Zustand)       │ │
+│  ├──────────────┤  │                 │ │
+│  │ProcessDisplay│  │                 │ │
+│  ├──────────────┤  │                 │ │
+│  │SettingsModal │  │                 │ │
 │  └──────────────┘  └─────────────────┘ │
 └─────────────────────────────────────────┘
 ```
@@ -68,7 +80,8 @@
 | `/api/sessions` | GET | 会话列表 | `user_id?` | `List[SessionResponse]` |
 | `/api/sessions/{id}` | DELETE | 删除会话 | - | `204 No Content` |
 | `/api/sessions/{id}/messages` | GET | 获取消息 | - | `List[MessageResponse]` |
-| `/api/chat` | POST | 发送消息（流式） | `{sessionId, message}` | SSE Stream |
+| `/api/chat` | POST | 发送消息（非流式） | `{sessionId, message}` | ChatResponse |
+| `/api/stream-chat` | POST | 发送消息（流式） | `{sessionId, message}` | SSE Stream |
 | `/api/sessions/{id}/clear` | DELETE | 清空会话 | - | `{"success": true}` |
 
 #### 1.2 流式响应格式 (SSE)
@@ -106,14 +119,14 @@ data: {"type": "done"}
 
 **MessageList**
 - 消息列表渲染（使用 Ant Design X 的 `Bubble.List`）
-- 自动滚动到底部
+- 自动滚动到底部（使用 RAF 优化）
 - 加载状态展示
+- Memo 优化：CopyButton、MessageContent、MessageItem、StreamingMessageItem
 
-**MessageBubble**
-- 用户消息：右对齐，蓝色背景（`#1890ff`）
-- AI 消息：左对齐，灰色背景（`#f5f5f5`）
-- 支持 Markdown 渲染（`@ant-design/x-markdown`）
-- 代码高亮（`react-syntax-highlighter`）
+**MessageContent**
+- 流式渲染：纯文本 + 光标动画
+- 完成后：Markdown 渲染
+- 支持 `react-syntax-highlighter` 代码高亮
 
 **InputArea**
 - 多行文本输入（`Input.TextArea`）
@@ -121,17 +134,29 @@ data: {"type": "done"}
 - Enter/Shift+Enter 支持
 - 清空会话按钮
 
-**ToolDisplay**（Collapse 组件）
+**ProcessDisplay**（Collapse 组件）
+- Agent 思考过程展示
 - 工具调用详情展示
 - 输入参数展示（JSON 格式）
 - 执行结果展示
 - 状态标签（pending/running/success/error）
+
+**SettingsModal**
+- 流式响应开关
+- 对话记忆开关
+- 工具调用开关
+- 图标化 UI 设计
 
 #### 2.2 打字机效果
 
 - 使用 Ant Design X 的 `typing` 属性
 - 配置：`effect: "typing"`, `step: 5-10`, `interval: 30-50ms`
 - 流式数据实时更新
+
+**性能优化**
+- RAF (requestAnimationFrame) 批量更新
+- 文本缓冲区减少渲染频率
+- useTransition 优化滚动性能
 
 #### 2.3 状态管理
 
@@ -236,8 +261,8 @@ langchain_chatbot/
 ├── backend/
 │   ├── main.py                 # FastAPI 应用入口
 │   ├── config.py               # 配置管理
+│   ├── chat_service.py         # 聊天服务层（流式/非流式逻辑）
 │   ├── chatbot_engine.py       # Chatbot 核心逻辑
-│   ├── database.py             # 数据库初始化
 │   ├── models.py               # Pydantic 数据模型
 │   ├── requirements.txt         # Python 依赖
 │   ├── .env                   # 环境变量（不提交）
@@ -263,7 +288,9 @@ langchain_chatbot/
 │   │   │   ├── ChatContainer.tsx
 │   │   │   ├── MessageList.tsx
 │   │   │   ├── InputArea.tsx
-│   │   │   └── ToolDisplay.tsx
+│   │   │   ├── ToolDisplay.tsx
+│   │   │   ├── ProcessDisplay.tsx  # 思考过程展示
+│   │   │   └── SettingsModal.tsx   # 设置弹窗
 │   │   ├── hooks/
 │   │   │   └── useChat.ts      # 聊天状态管理
 │   │   ├── services/
@@ -271,7 +298,8 @@ langchain_chatbot/
 │   │   ├── types/
 │   │   │   └── index.ts        # TypeScript 类型
 │   │   ├── store/
-│   │   │   └── chatStore.ts    # Zustand store
+│   │   │   ├── chatStore.ts    # 聊天状态
+│   │   │   └── settingsStore.ts # 设置状态
 │   │   ├── App.tsx
 │   │   └── main.tsx
 │   ├── index.html
@@ -290,37 +318,45 @@ langchain_chatbot/
 
 ### Phase 1: 后端基础
 - [x] 搭建 FastAPI 项目结构
-- [ ] 实现 SQLite 数据库初始化
-- [ ] 实现数据库 CRUD 操作
-- [ ] 实现会话管理逻辑
-- [ ] 实现 `/api/health` 端点
+- [x] 实现 SQLite 数据库初始化
+- [x] 实现数据库 CRUD 操作
+- [x] 实现会话管理逻辑
+- [x] 实现 `/api/health` 端点
 
 ### Phase 2: Chatbot 核心
-- [ ] 迁移 demo_zhipu.py 的 Agent 逻辑
-- [ ] 集成工具系统
-- [ ] 实现流式响应生成器
-- [ ] 实现 `/api/chat` SSE 端点
-- [ ] 会话历史读写
+- [x] 迁移 demo_zhipu.py 的 Agent 逻辑
+- [x] 集成工具系统
+- [x] 实现流式响应生成器
+- [x] 实现 `/api/stream-chat` SSE 端点
+- [x] 实现 `/api/chat` 非流式端点
+- [x] 会话历史读写
+- [x] 提取 chat_service.py 服务层
 
 ### Phase 3: 前端基础
-- [ ] 搭建 React + Vite + Ant Design X 项目
-- [ ] 实现基础 UI 布局
-- [ ] 实现 ChatContainer 组件
-- [ ] 实现 MessageList 组件
-- [ ] 实现 InputArea 组件
+- [x] 搭建 React + Vite + Ant Design X 项目
+- [x] 实现基础 UI 布局
+- [x] 实现 ChatContainer 组件
+- [x] 实现 MessageList 组件
+- [x] 实现 InputArea 组件
 
 ### Phase 4: 前端交互
-- [ ] 实现 SSE 消息接收
-- [ ] 实现打字机效果
-- [ ] 实现 Markdown 渲染
-- [ ] 实现 ToolDisplay 组件
-- [ ] 状态管理集成
+- [x] 实现 SSE 消息接收
+- [x] 实现打字机效果
+- [x] 实现 Markdown 渲染
+- [x] 实现 ToolDisplay 组件
+- [x] 实现 ProcessDisplay 组件
+- [x] 实现 SettingsModal 组件
+- [x] 状态管理集成
+- [x] RAF 性能优化
 
 ### Phase 5: 集成与优化
-- [ ] 前后端联调
-- [ ] 错误处理完善
-- [ ] UI 样式优化
-- [ ] 响应式适配
+- [x] 前后端联调
+- [x] 错误处理完善
+- [x] UI 样式优化
+- [x] 响应式适配
+- [ ] 添加用户认证系统（JWT）
+- [ ] 支持多租户
+- [ ] 添加日志系统
 
 ---
 
@@ -537,7 +573,8 @@ python-multipart==0.0.6
 
 ---
 
-**文档版本**: v1.0
+**文档版本**: v2.0
 **创建日期**: 2026-01-11
-**状态**: POC Demo
+**更新日期**: 2026-01-24
+**状态**: POC Demo（核心功能已完成）
 **维护者**: LangChain Chatbot Team
