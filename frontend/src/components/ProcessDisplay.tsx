@@ -14,6 +14,12 @@ import {
 import { Message, ToolStep } from '../types'
 import ToolOutputDisplay from './ToolOutputDisplay'
 
+const StopSquareIcon = () => (
+  <svg width="1em" height="1em" viewBox="0 0 16 16" fill="currentColor" style={{ fontSize: '14px', color: '#ff4d4f' }}>
+    <rect width="16" height="16" rx="2" fill="currentColor" />
+  </svg>
+)
+
 interface ProcessDisplayProps {
   message: Message
 }
@@ -42,6 +48,8 @@ const ProcessDisplay: React.FC<ProcessDisplayProps> = ({ message }) => {
         return <CheckCircleOutlined style={{ color: '#52c41a', fontSize: '14px' }} />
       case 'failed':
         return <CloseCircleOutlined style={{ color: '#ff4d4f', fontSize: '14px' }} />
+      case 'cancelled':
+        return <StopSquareIcon />
       default:
         return null
     }
@@ -53,6 +61,7 @@ const ProcessDisplay: React.FC<ProcessDisplayProps> = ({ message }) => {
       running: 'processing',
       completed: 'success',
       failed: 'error',
+      cancelled: 'error',
     }
     return <Tag color={colors[status] || 'default'}>{status}</Tag>
   }
@@ -67,6 +76,7 @@ const ProcessDisplay: React.FC<ProcessDisplayProps> = ({ message }) => {
   const isStepExpanded = (step: ToolStep, index: number): boolean => {
     if (step.status === 'running') return true
     if (step.status === 'failed') return true
+    if (step.status === 'cancelled') return true
     return !collapsedSteps[index]
   }
 
@@ -151,16 +161,18 @@ const ProcessDisplay: React.FC<ProcessDisplayProps> = ({ message }) => {
                         return (
                           <div
                             key={index}
-                            style={{
-                              borderRadius: '6px',
-                              border: '1px solid #d9d9d9',
-                              background:
-                                step.status === 'running'
-                                  ? '#e6f7ff'
-                                  : step.status === 'failed'
-                                    ? '#fff1f0'
-                                    : '#fafafa',
-                            }}
+                              style={{
+                                borderRadius: '6px',
+                                border: step.status === 'failed' || step.status === 'cancelled'
+                                  ? '1px solid #ffccc7'
+                                  : '1px solid #d9d9d9',
+                                background:
+                                  step.status === 'running'
+                                    ? '#e6f7ff'
+                                    : step.status === 'failed' || step.status === 'cancelled'
+                                      ? '#fff1f0'
+                                      : '#fafafa',
+                              }}
                           >
                             <div
                               onClick={() => toggleStep(index)}
@@ -174,7 +186,7 @@ const ProcessDisplay: React.FC<ProcessDisplayProps> = ({ message }) => {
                                 e.currentTarget.style.background =
                                   step.status === 'running'
                                     ? '#bae7ff'
-                                    : step.status === 'failed'
+                                    : step.status === 'failed' || step.status === 'cancelled'
                                       ? '#ffccc7'
                                       : '#f5f5f5'
                               }}
@@ -182,7 +194,7 @@ const ProcessDisplay: React.FC<ProcessDisplayProps> = ({ message }) => {
                                 e.currentTarget.style.background =
                                   step.status === 'running'
                                     ? '#e6f7ff'
-                                    : step.status === 'failed'
+                                    : step.status === 'failed' || step.status === 'cancelled'
                                       ? '#fff1f0'
                                       : '#fafafa'
                               }}

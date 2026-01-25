@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef, useState } from 'react'
+import { useEffect, useCallback, useRef } from 'react'
 import useChatStore from '../store/chatStore'
 import useSettingsStore from '../store/settingsStore'
 import { SSEEvent, ToolStep, ChatResponse } from '../types'
@@ -36,6 +36,16 @@ export const useChat = () => {
         }
       }
 
+      const messages = useChatStore.getState().messages
+      const lastMessage = messages[messages.length - 1]
+      if (lastMessage && lastMessage.role === 'assistant' && lastMessage.tool_steps && lastMessage.tool_steps.length > 0) {
+        const updatedToolSteps: ToolStep[] = lastMessage.tool_steps.map(step => ({
+          ...step,
+          status: 'cancelled'
+        }))
+        updateLastAssistantMessage({ tool_steps: updatedToolSteps })
+      }
+
       abortControllerRef.current.abort()
       abortControllerRef.current = null
 
@@ -43,7 +53,7 @@ export const useChat = () => {
       setCurrentStreamingMessage('')
       message.info('已取消生成')
     }
-  }, [sessionId, setLoading, setCurrentStreamingMessage])
+  }, [sessionId, setLoading, setCurrentStreamingMessage, updateLastAssistantMessage])
 
   const sendMessage = useCallback(
     async (message: string) => {
@@ -243,7 +253,7 @@ export const useChat = () => {
           const chatResponse = response as ChatResponse
 
           if (chatResponse.tool_steps && chatResponse.tool_steps.length > 0) {
-            const updatedToolSteps = chatResponse.tool_steps.map((ts) => ({
+            const updatedToolSteps: ToolStep[] = chatResponse.tool_steps.map((ts) => ({
               id: Date.now(),
               message_id: Date.now(),
               step_number: 1,
@@ -254,7 +264,7 @@ export const useChat = () => {
               started_at: new Date().toISOString(),
               completed_at: new Date().toISOString(),
               duration_ms: ts.duration_ms,
-              status: ts.status,
+              status: ts.status as ToolStep['status'],
             }))
             updateLastAssistantMessage({ tool_steps: updatedToolSteps })
           }

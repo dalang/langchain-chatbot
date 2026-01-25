@@ -38,7 +38,7 @@ export interface ToolStep {
   started_at: string
   completed_at: string | null
   duration_ms: number | null
-  status: string
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
 }
 
 export interface ChatState {
@@ -51,7 +51,7 @@ export interface ChatState {
 }
 
 export interface SSEEvent {
-  type: 'message' | 'stream_chunk' | 'thought' | 'tool_start' | 'tool_result' | 'done' | 'error'
+  type: 'message' | 'stream_chunk' | 'thought' | 'tool_start' | 'tool_result' | 'done' | 'error' | 'cancelled'
   content?: string
   tool?: string
   input?: Record<string, any>
