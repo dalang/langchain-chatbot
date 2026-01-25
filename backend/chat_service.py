@@ -104,7 +104,11 @@ async def chat_stream_generator(
 
             output = chunk.get("output")
             if output:
-                full_output = output
+                # 如果 output 是 AIMessage 对象，提取其 content
+                if hasattr(output, "content"):
+                    full_output = output.content
+                else:
+                    full_output = output
                 async for event in _stream_text(full_output):
                     yield event
 
@@ -150,11 +154,16 @@ async def chat_generator(
 
     result = await chat_async(message, enable_tools=enable_tools)
 
+    # 如果 result["output"] 是 AIMessage 对象，提取其 content
+    output = result["output"]
+    if hasattr(output, "content"):
+        output = output.content
+
     assistant_message = await MessageRepository.create(
         db,
         session_id=session_id,
         role="assistant",
-        content=result["output"],
+        content=output,
         model=settings.MODEL_NAME,
     )
 
@@ -215,7 +224,7 @@ async def chat_generator(
     )
 
     return ChatResponse(
-        output=result["output"],
+        output=output,  # 使用已经提取的字符串版本
         intermediate_steps=[],
         tool_steps=tool_steps,
         message=message_response,

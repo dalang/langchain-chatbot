@@ -2,6 +2,7 @@ import os
 from sys import exec_prefix
 
 from backend.config import settings
+from backend.logger import get_llm_callback_handler
 
 os.environ["ZHIPUAI_API_KEY"] = settings.ZHIPUAI_API_KEY
 os.environ["TAVILY_API_KEY"] = settings.TAVILY_API_KEY
@@ -19,7 +20,9 @@ from langchain_core.callbacks import StreamingStdOutCallbackHandler
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langsmith import Client
 
+# Enable detailed LLM logging
 langchain.debug = True
+llm_callback_handler = get_llm_callback_handler()
 
 
 # 创建自定义 JSON prompt，明确要求转义引号
@@ -89,7 +92,6 @@ except Exception as e:
 
 
 tools = [calculator, tavily_search]
-no_tools = []
 
 # No-tools prompt for when tools are disabled
 no_tools_prompt = ChatPromptTemplate.from_messages(
@@ -118,7 +120,7 @@ def get_agent_executor(streaming: bool = False, enable_tools: bool = True):
     agent_executor = executors.get(key)
     if not agent_executor:
         agent = None
-        current_tools = tools if enable_tools else no_tools
+        current_tools = tools
 
         if streaming:
             # Use react_prompt for ReAct agent with streaming
@@ -126,7 +128,7 @@ def get_agent_executor(streaming: bool = False, enable_tools: bool = True):
                 model=settings.MODEL_NAME,
                 temperature=settings.TEMPERATURE,
                 streaming=True,
-                callbacks=[StreamingStdOutCallbackHandler()],
+                callbacks=[StreamingStdOutCallbackHandler(), llm_callback_handler],
             )
             if enable_tools:
                 agent = create_react_agent(
@@ -138,7 +140,9 @@ def get_agent_executor(streaming: bool = False, enable_tools: bool = True):
         else:
             # Use json_prompt for JSON chat agent
             llm = ChatZhipuAI(
-                model=settings.MODEL_NAME, temperature=settings.TEMPERATURE
+                model=settings.MODEL_NAME,
+                temperature=settings.TEMPERATURE,
+                callbacks=[llm_callback_handler],
             )
             if enable_tools:
                 agent = create_json_chat_agent(llm, current_tools, custom_json_prompt)
@@ -154,6 +158,7 @@ def get_agent_executor(streaming: bool = False, enable_tools: bool = True):
                 handle_parsing_errors=True,
                 max_iterations=settings.MAX_ITERATIONS,
                 return_intermediate_steps=True,
+                callbacks=[llm_callback_handler],
             )
         else:
             # When tools are disabled, we don't need AgentExecutor

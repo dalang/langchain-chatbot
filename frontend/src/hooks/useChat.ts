@@ -23,10 +23,12 @@ export const useChat = () => {
   } = useChatStore()
 
   const useStreamingChat = useSettingsStore((state) => state.useStreamingChat)
-  const enableToolCalls = useSettingsStore((state) => state.enableToolCalls)
-
+ 
   const sendMessage = useCallback(
     async (message: string) => {
+      // 从 store 中获取最新的设置值，避免闭包陷阱
+      const enableToolCalls = useSettingsStore.getState().enableToolCalls
+      
       if (!sessionId || !message.trim()) return
 
       addMessage({

@@ -19,17 +19,13 @@ from backend.chatbot_engine import tools
 from backend.db.base import create_db_and_tables, dispose_db, get_db
 from backend.db.repositories import MessageRepository, SessionRepository
 from backend.models import (
+    ChatRequest,
     ChatResponse,
     MessageResponse,
     SessionCreate,
     SessionResponse,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
-
-
-class ChatRequest(BaseModel):
-    sessionId: str
-    message: str
 
 
 @asynccontextmanager
