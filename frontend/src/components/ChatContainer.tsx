@@ -25,7 +25,7 @@ const ChatContainer: React.FC = () => {
 
   return (
     <>
-      <div style={{ display: 'flex', flexDirection: 'column', height: '90vh', gap: 16 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '85dvh', gap: 16 }}>
         <Card
           title={
             <Flex align="center" gap={8}>
@@ -67,7 +67,7 @@ const ChatContainer: React.FC = () => {
             overflow: 'hidden',
           }}
         >
-          <Flex vertical style={{ flex: 1, overflow: 'hidden' }}>
+          <Flex vertical style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
             <MessageList
               messages={messages}
               currentStreamingMessage={currentStreamingMessage}
