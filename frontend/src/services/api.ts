@@ -45,6 +45,13 @@ export const sessionApi = {
   },
 }
 
+export interface ConfigInfo {
+  modelName: string
+  temperature: number
+  maxIterations: number
+  tools: string[]
+}
+
 export const chatApi = {
   send: async (
     sessionId: string,
@@ -72,6 +79,11 @@ export const chatApi = {
       })
       return response.data
     }
+  },
+
+  getConfig: async (): Promise<ConfigInfo> => {
+    const response = await api.get<ConfigInfo>('/config')
+    return response.data
   },
 }
 

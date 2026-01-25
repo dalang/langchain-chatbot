@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
 import { Card, Flex } from 'antd'
-import { SettingOutlined } from '@ant-design/icons'
+import { SettingOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import MessageList from './MessageList'
 import InputArea from './InputArea'
 import SettingsModal from './SettingsModal'
+import ConfigModal from './ConfigModal'
 import useChat from '../hooks/useChat'
 
 const ChatContainer: React.FC = () => {
@@ -16,16 +17,23 @@ const ChatContainer: React.FC = () => {
   } = useChat()
 
   const [settingsVisible, setSettingsVisible] = useState(false)
+  const [configVisible, setConfigVisible] = useState(false)
 
   return (
     <>
       <Card
         title="LangChain 智能助手"
         extra={
-          <SettingOutlined
-            onClick={() => setSettingsVisible(true)}
-            style={{ cursor: 'pointer' }}
-          />
+          <Flex gap={12}>
+            <InfoCircleOutlined
+              onClick={() => setConfigVisible(true)}
+              style={{ cursor: 'pointer', fontSize: 16 }}
+            />
+            <SettingOutlined
+              onClick={() => setSettingsVisible(true)}
+              style={{ cursor: 'pointer', fontSize: 16 }}
+            />
+          </Flex>
         }
         style={{
           height: '90vh',
@@ -51,6 +59,10 @@ const ChatContainer: React.FC = () => {
       <SettingsModal
         visible={settingsVisible}
         onClose={() => setSettingsVisible(false)}
+      />
+      <ConfigModal
+        visible={configVisible}
+        onClose={() => setConfigVisible(false)}
       />
     </>
   )
