@@ -1,51 +1,56 @@
-import React, { useState } from 'react'
-import { Input, Button, Flex, Space } from 'antd'
-import { SendOutlined, ClearOutlined } from '@ant-design/icons'
+import React, { useState } from "react";
+import { Input, Button, Flex, Space } from "antd";
+import { SendOutlined, ClearOutlined } from "@ant-design/icons";
 
 const StopSquare = () => (
   <svg width="1em" height="1em" viewBox="0 0 16 16" fill="currentColor">
     <rect width="16" height="16" rx="2" fill="#ff4d4f" />
   </svg>
-)
+);
 
 interface InputAreaProps {
-  onSend: (message: string) => void
-  onClear: () => void
-  onCancel: () => void
-  isLoading: boolean
+  onSend: (message: string) => void;
+  onClear: () => void;
+  onCancel: () => void;
+  isLoading: boolean;
 }
 
-const InputArea: React.FC<InputAreaProps> = ({ onSend, onClear, onCancel, isLoading }) => {
-  const [inputValue, setInputValue] = useState('')
+const InputArea: React.FC<InputAreaProps> = ({
+  onSend,
+  onClear,
+  onCancel,
+  isLoading,
+}) => {
+  const [inputValue, setInputValue] = useState("");
 
   const handleSend = () => {
-    if (!inputValue.trim() || isLoading) return
+    if (!inputValue.trim() || isLoading) return;
 
-    onSend(inputValue)
-    setInputValue('')
-  }
+    onSend(inputValue);
+    setInputValue("");
+  };
 
   const handleButtonClick = () => {
     if (isLoading) {
-      onCancel()
+      onCancel();
     } else {
-      handleSend()
+      handleSend();
     }
-  }
+  };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
     }
-  }
+  };
 
   return (
     <div
       style={{
-        padding: '16px',
-        borderTop: '1px solid #f0f0f0',
-        background: '#fff',
+        padding: "16px",
+        borderTop: "1px solid #f0f0f0",
+        background: "#fff",
         flexShrink: 0,
       }}
     >
@@ -61,7 +66,11 @@ const InputArea: React.FC<InputAreaProps> = ({ onSend, onClear, onCancel, isLoad
             style={{ flex: 1 }}
           />
           <Space className="input-area-space">
-            <Button icon={<ClearOutlined />} onClick={onClear} disabled={isLoading}>
+            <Button
+              icon={<ClearOutlined />}
+              onClick={onClear}
+              disabled={isLoading}
+            >
               清空
             </Button>
             <Button
@@ -69,7 +78,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSend, onClear, onCancel, isLoad
               icon={isLoading ? <StopSquare /> : <SendOutlined />}
               onClick={handleButtonClick}
             >
-              {isLoading ? '发送中' : '发送'}
+              {isLoading ? "发送中" : "发送"}
             </Button>
           </Space>
         </Flex>
@@ -88,29 +97,29 @@ const InputArea: React.FC<InputAreaProps> = ({ onSend, onClear, onCancel, isLoad
             flex-direction: row;
             gap: 8px;
           }
-          @media (max-width: 767px) {
+          @media (max-width: 460px) {
             .input-area-flex {
-              flex-direction: column;
-              align-items: stretch;
+              flex-direction: row;
+              align-items: flex-end;
               gap: 8px;
             }
             .input-area-flex > :first-child {
-              width: 100%;
-              flex: none;
+              width: auto;
+              flex: 1;
             }
             .input-area-space {
               flex-direction: column;
-              width: 100%;
+              width: auto;
               gap: 8px;
             }
             .input-area-space .ant-btn {
-              width: 100%;
+              width: auto;
             }
           }
         `}</style>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default InputArea
+export default InputArea;
