@@ -28,20 +28,20 @@ export const useChat = () => {
 
   const cancelMessage = useCallback(async () => {
     if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-      abortControllerRef.current = null
-
       if (sessionId) {
         try {
           await sessionApi.cancel(sessionId)
-          message.info('已取消生成')
         } catch (error) {
           console.error('Failed to cancel session:', error)
         }
       }
 
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+
       setLoading(false)
       setCurrentStreamingMessage('')
+      message.info('已取消生成')
     }
   }, [sessionId, setLoading, setCurrentStreamingMessage])
 

@@ -82,11 +82,15 @@ export const chatApi = {
       })
       return response.body!
     } else {
-      const response = await axios.post<ChatResponse>(endpoint, {
-        sessionId,
-        message,
-        options: { enableToolCalls, enableMemory },
-      })
+      const response = await axios.post<ChatResponse>(
+        endpoint,
+        {
+          sessionId,
+          message,
+          options: { enableToolCalls, enableMemory },
+        },
+        { signal }
+      )
       return response.data
     }
   },

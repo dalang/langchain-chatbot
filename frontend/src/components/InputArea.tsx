@@ -1,6 +1,12 @@
 import React, { useState } from 'react'
 import { Input, Button, Flex, Space } from 'antd'
-import { SendOutlined, ClearOutlined, StopOutlined } from '@ant-design/icons'
+import { SendOutlined, ClearOutlined } from '@ant-design/icons'
+
+const StopSquare = () => (
+  <svg width="1em" height="1em" viewBox="0 0 16 16" fill="currentColor">
+    <rect width="16" height="16" rx="2" fill="#ff4d4f" />
+  </svg>
+)
 
 interface InputAreaProps {
   onSend: (message: string) => void
@@ -17,6 +23,14 @@ const InputArea: React.FC<InputAreaProps> = ({ onSend, onClear, onCancel, isLoad
 
     onSend(inputValue)
     setInputValue('')
+  }
+
+  const handleButtonClick = () => {
+    if (isLoading) {
+      onCancel()
+    } else {
+      handleSend()
+    }
   }
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -49,18 +63,12 @@ const InputArea: React.FC<InputAreaProps> = ({ onSend, onClear, onCancel, isLoad
           <Button icon={<ClearOutlined />} onClick={onClear} disabled={isLoading}>
             清空
           </Button>
-          {isLoading && (
-            <Button icon={<StopOutlined />} onClick={onCancel}>
-              停止
-            </Button>
-          )}
           <Button
             type="primary"
-            icon={<SendOutlined />}
-            onClick={handleSend}
-            loading={isLoading}
+            icon={isLoading ? <StopSquare /> : <SendOutlined />}
+            onClick={handleButtonClick}
           >
-            发送
+            {isLoading ? '发送中' : '发送'}
           </Button>
         </Space>
       </Flex>

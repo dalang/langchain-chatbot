@@ -180,134 +180,145 @@ async def chat_generator(
     Follows the same pattern as chat_stream_generator but returns
     a single ChatResponse instead of streaming SSE events.
     """
-    session = await SessionRepository.get_by_id(db, session_id)
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
-        )
+    stop_event = cancel_manager.get_stop_event(session_id)
 
-    await MessageRepository.create(
-        db,
-        session_id=session_id,
-        role="user",
-        content=message,
-    )
-
-    # Load conversation history if memory is enabled
-    chat_history = None
-    if enable_memory:
-        messages = await MessageRepository.get_by_session_id(
-            db, session_id, skip=0, limit=100
-        )
-        # Exclude the message we just created
-        if messages and messages[-1].content == message:
-            messages = messages[:-1]
-        chat_history = MemoryManager.load_history(messages)
-
-    result = await chat_async(
-        message,
-        enable_tools=enable_tools,
-        enable_memory=enable_memory,
-        chat_history=chat_history,
-    )
-
-    # 如果 result["output"] 是 AIMessage 对象，提取其 content
-    output = result["output"]
-    if hasattr(output, "content"):
-        output = output.content
-
-    token_usage_data = get_last_token_usage()
-    tokens_used: Optional[dict[str, int]] = None
-    if token_usage_data:
-        tokens_used = {
-            "prompt_tokens": token_usage_data.get("prompt_tokens", 0),
-            "completion_tokens": token_usage_data.get("completion_tokens", 0),
-            "total_tokens": token_usage_data.get("total_tokens", 0),
-        }
-    else:
-        if hasattr(result["output"], "response_metadata"):
-            metadata = result["output"].response_metadata
-            if "token_usage" in metadata:
-                token_usage_metadata = metadata["token_usage"]
-                tokens_used = {
-                    "prompt_tokens": token_usage_metadata.get("prompt_tokens", 0),
-                    "completion_tokens": token_usage_metadata.get(
-                        "completion_tokens", 0
-                    ),
-                    "total_tokens": token_usage_metadata.get("total_tokens", 0),
-                }
-
-    assistant_message = await MessageRepository.create(
-        db,
-        session_id=session_id,
-        role="assistant",
-        content=output,
-        model=settings.MODEL_NAME,
-        tokens_used=tokens_used,
-    )
-
-    if result.get("intermediate_steps"):
-        for i, step in enumerate(result["intermediate_steps"]):
-            if len(step) >= 2:
-                action, observation = step[0], step[1]
-
-                tool_input = (
-                    action.tool_input
-                    if isinstance(action.tool_input, dict)
-                    else {"input": action.tool_input}
-                )
-
-                tool_step = await ToolStepRepository.create(
-                    db,
-                    message_id=assistant_message.id,
-                    step_number=i + 1,
-                    tool_name=action.tool,
-                    tool_input=tool_input,
-                )
-
-                obs_str = str(observation)
-                await ToolStepRepository.complete(
-                    db, tool_step_id=tool_step.id, output=obs_str, duration_ms=120
-                )
-
-    tool_steps = []
-    for tool_step in await ToolStepRepository.get_by_message_id(
-        db, assistant_message.id
-    ):
-        tool_steps.append(
-            ToolStepResponse(
-                id=tool_step.id,
-                message_id=tool_step.message_id,
-                step_number=tool_step.step_number,
-                tool_name=tool_step.tool_name,
-                tool_input=tool_step.tool_input,
-                tool_output=tool_step.tool_output,
-                tool_error=tool_step.tool_error,
-                started_at=tool_step.started_at,
-                completed_at=tool_step.completed_at,
-                duration_ms=tool_step.duration_ms,
-                status=tool_step.status,
+    try:
+        session = await SessionRepository.get_by_id(db, session_id)
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
             )
+
+        await MessageRepository.create(
+            db,
+            session_id=session_id,
+            role="user",
+            content=message,
         )
 
-    message_response = MessageResponse(
-        id=assistant_message.id,
-        session_id=assistant_message.session_id,
-        role=assistant_message.role,
-        content=assistant_message.content,
-        tool_calls=assistant_message.tool_calls,
-        created_at=assistant_message.created_at,
-        model=assistant_message.model,
-        tokens_used=assistant_message.tokens_used,
-        tool_steps=[],
-    )
+        # Load conversation history if memory is enabled
+        chat_history = None
+        if enable_memory:
+            messages = await MessageRepository.get_by_session_id(
+                db, session_id, skip=0, limit=100
+            )
+            # Exclude the message we just created
+            if messages and messages[-1].content == message:
+                messages = messages[:-1]
+            chat_history = MemoryManager.load_history(messages)
 
-    return ChatResponse(
-        output=output,
-        intermediate_steps=[],
-        tool_steps=tool_steps,
-        message=message_response,
-    )
+        result = await chat_async(
+            message,
+            enable_tools=enable_tools,
+            enable_memory=enable_memory,
+            chat_history=chat_history,
+            stop_event=stop_event,
+        )
+
+        # 如果 result["output"] 是 AIMessage 对象，提取其 content
+        output = result["output"]
+        if hasattr(output, "content"):
+            output = output.content
+
+        token_usage_data = get_last_token_usage()
+        tokens_used: Optional[dict[str, int]] = None
+        if token_usage_data:
+            tokens_used = {
+                "prompt_tokens": token_usage_data.get("prompt_tokens", 0),
+                "completion_tokens": token_usage_data.get("completion_tokens", 0),
+                "total_tokens": token_usage_data.get("total_tokens", 0),
+            }
+        else:
+            if hasattr(result["output"], "response_metadata"):
+                metadata = result["output"].response_metadata
+                if "token_usage" in metadata:
+                    token_usage_metadata = metadata["token_usage"]
+                    tokens_used = {
+                        "prompt_tokens": token_usage_metadata.get("prompt_tokens", 0),
+                        "completion_tokens": token_usage_metadata.get(
+                            "completion_tokens", 0
+                        ),
+                        "total_tokens": token_usage_metadata.get("total_tokens", 0),
+                    }
+
+        assistant_message = await MessageRepository.create(
+            db,
+            session_id=session_id,
+            role="assistant",
+            content=output,
+            model=settings.MODEL_NAME,
+            tokens_used=tokens_used,
+        )
+
+        if result.get("intermediate_steps"):
+            for i, step in enumerate(result["intermediate_steps"]):
+                if len(step) >= 2:
+                    action, observation = step[0], step[1]
+
+                    tool_input = (
+                        action.tool_input
+                        if isinstance(action.tool_input, dict)
+                        else {"input": action.tool_input}
+                    )
+
+                    tool_step = await ToolStepRepository.create(
+                        db,
+                        message_id=assistant_message.id,
+                        step_number=i + 1,
+                        tool_name=action.tool,
+                        tool_input=tool_input,
+                    )
+
+                    obs_str = str(observation)
+                    await ToolStepRepository.complete(
+                        db, tool_step_id=tool_step.id, output=obs_str, duration_ms=120
+                    )
+
+        tool_steps = []
+        for tool_step in await ToolStepRepository.get_by_message_id(
+            db, assistant_message.id
+        ):
+            tool_steps.append(
+                ToolStepResponse(
+                    id=tool_step.id,
+                    message_id=tool_step.message_id,
+                    step_number=tool_step.step_number,
+                    tool_name=tool_step.tool_name,
+                    tool_input=tool_step.tool_input,
+                    tool_output=tool_step.tool_output,
+                    tool_error=tool_step.tool_error,
+                    started_at=tool_step.started_at,
+                    completed_at=tool_step.completed_at,
+                    duration_ms=tool_step.duration_ms,
+                    status=tool_step.status,
+                )
+            )
+
+        message_response = MessageResponse(
+            id=assistant_message.id,
+            session_id=assistant_message.session_id,
+            role=assistant_message.role,
+            content=assistant_message.content,
+            tool_calls=assistant_message.tool_calls,
+            created_at=assistant_message.created_at,
+            model=assistant_message.model,
+            tokens_used=assistant_message.tokens_used,
+            tool_steps=[],
+        )
+
+        return ChatResponse(
+            output=output,
+            intermediate_steps=[],
+            tool_steps=tool_steps,
+            message=message_response,
+        )
+    except asyncio.CancelledError:
+        raise HTTPException(
+            status_code=499,
+            detail="Request cancelled by user",
+        )
+    finally:
+        cancel_manager.cleanup(session_id)
 
 
 async def _stream_text(text: str) -> AsyncGenerator[str, None]:
