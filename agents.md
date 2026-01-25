@@ -394,8 +394,8 @@ SESSION_EXPIRE_HOURS=24
 cd backend
 
 # 创建虚拟环境
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+uv venv
+source .venv/bin/activate
 
 # 安装依赖
 pip install -r requirements.txt
@@ -407,6 +407,9 @@ cp .env.example .env
 # 启动服务
 uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
+
+### backend 特别说明
+- **执行 python 脚本前必须通过 `source .venv/bin/activate` 激活虚拟环境** 
 
 ### 前端启动
 ```bash
