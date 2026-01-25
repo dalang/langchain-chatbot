@@ -225,6 +225,9 @@ const MessageList: React.FC<MessageListProps> = ({ messages, currentStreamingMes
         overflowY: 'auto',
         padding: '16px',
         background: '#fafafa',
+        minHeight: 0,
+        scrollbarWidth: 'auto',
+        msOverflowStyle: 'auto',
       }}
     >
       <Flex vertical gap="small">

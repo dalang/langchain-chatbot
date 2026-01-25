@@ -3,7 +3,7 @@ import ChatContainer from './components/ChatContainer'
 
 const App: React.FC = () => {
   return (
-    <div style={{ padding: '20px', background: '#f0f2f5', minHeight: '100vh' }}>
+    <div style={{ padding: '20px', background: '#f0f2f5', height: '100vh', overflow: 'hidden' }}>
       <ChatContainer />
     </div>
   )

@@ -31,6 +31,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSend, onClear, isLoading }) => 
         padding: '16px',
         borderTop: '1px solid #f0f0f0',
         background: '#fff',
+        flexShrink: 0,
       }}
     >
       <Flex gap="small" align="flex-end">
