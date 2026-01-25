@@ -4,6 +4,7 @@
 
 ## 🎬 演示视频
 
+https://github.com/user-attachments/assets/bb7e0e1a-7620-4be0-b83c-1ee925e5c444
 
 ## 🎯 产品功能
 
