@@ -19,17 +19,13 @@ from backend.chatbot_engine import tools
 from backend.db.base import create_db_and_tables, dispose_db, get_db
 from backend.db.repositories import MessageRepository, SessionRepository
 from backend.models import (
+    ChatRequest,
     ChatResponse,
     MessageResponse,
     SessionCreate,
     SessionResponse,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
-
-
-class ChatRequest(BaseModel):
-    sessionId: str
-    message: str
 
 
 @asynccontextmanager
@@ -160,7 +156,9 @@ async def clear_session(session_id: str, db: AsyncSession = Depends(get_db)):
 async def stream_chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     """Real streaming chat endpoint using async_chat_stream."""
     return StreamingResponse(
-        chat_stream_generator(request.sessionId, request.message, db),
+        chat_stream_generator(
+            request.sessionId, request.message, db, request.options.enableToolCalls
+        ),
         media_type="text/event-stream",
     )
 
@@ -172,7 +170,9 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     Follows the same pattern as stream_chat but returns a single
     ChatResponse instead of streaming SSE events.
     """
-    return await chat_generator(request.sessionId, request.message, db)
+    return await chat_generator(
+        request.sessionId, request.message, db, request.options.enableToolCalls
+    )
 
 
 if __name__ == "__main__":

@@ -23,9 +23,12 @@ export const useChat = () => {
   } = useChatStore()
 
   const useStreamingChat = useSettingsStore((state) => state.useStreamingChat)
-
+ 
   const sendMessage = useCallback(
     async (message: string) => {
+      // 从 store 中获取最新的设置值，避免闭包陷阱
+      const enableToolCalls = useSettingsStore.getState().enableToolCalls
+      
       if (!sessionId || !message.trim()) return
 
       addMessage({
@@ -62,7 +65,12 @@ export const useChat = () => {
       setCurrentStreamingMessage('')
 
       try {
-        const response = await chatApi.send(sessionId, message, useStreamingChat)
+        const response = await chatApi.send(
+          sessionId,
+          message,
+          useStreamingChat,
+          enableToolCalls
+        )
 
         if (!response) {
           throw new Error('No response body')

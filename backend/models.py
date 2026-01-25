@@ -72,6 +72,20 @@ class ToolStepResponse(BaseModel):
         from_attributes = True
 
 
+class ChatOptions(BaseModel):
+    """Options for chat requests."""
+
+    enableToolCalls: bool = True
+
+
+class ChatRequest(BaseModel):
+    """Request model for chat endpoints."""
+
+    sessionId: str
+    message: str
+    options: ChatOptions = ChatOptions()
+
+
 class ChatResponse(BaseModel):
     """Response model for non-streaming chat endpoint."""
 
