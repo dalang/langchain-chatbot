@@ -4,6 +4,7 @@ import {
   ThunderboltOutlined,
   DatabaseOutlined,
   ToolOutlined,
+  BugOutlined,
 } from "@ant-design/icons";
 import useSettingsStore from "../store/settingsStore";
 
@@ -28,9 +29,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }) => {
     useStreamingChat,
     enableMemory,
     enableToolCalls,
+    debugMode,
     toggleStreamingChat,
     toggleMemory,
     toggleToolCalls,
+    toggleDebugMode,
   } = useSettingsStore();
 
   const settings: SettingItem[] = [
@@ -57,6 +60,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }) => {
       description: "允许AI使用搜索、计算等工具扩展能力",
       checked: enableToolCalls,
       onChange: toggleToolCalls,
+    },
+    {
+      key: "debug",
+      icon: <BugOutlined style={{ fontSize: 20, color: "#f5222d" }} />,
+      title: "Debug 模式",
+      description: "启用调试界面，显示详细的配置和运行时信息",
+      checked: debugMode,
+      onChange: toggleDebugMode,
     },
   ];
 
