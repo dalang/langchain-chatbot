@@ -157,7 +157,11 @@ async def stream_chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     """Real streaming chat endpoint using async_chat_stream."""
     return StreamingResponse(
         chat_stream_generator(
-            request.sessionId, request.message, db, request.options.enableToolCalls
+            request.sessionId,
+            request.message,
+            db,
+            request.options.enableToolCalls,
+            request.options.enableMemory,
         ),
         media_type="text/event-stream",
     )
@@ -171,7 +175,11 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     ChatResponse instead of streaming SSE events.
     """
     return await chat_generator(
-        request.sessionId, request.message, db, request.options.enableToolCalls
+        request.sessionId,
+        request.message,
+        db,
+        request.options.enableToolCalls,
+        request.options.enableMemory,
     )
 
 

@@ -76,6 +76,7 @@ class ChatOptions(BaseModel):
     """Options for chat requests."""
 
     enableToolCalls: bool = True
+    enableMemory: bool = False
 
 
 class ChatRequest(BaseModel):

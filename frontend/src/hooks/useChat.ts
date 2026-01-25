@@ -23,12 +23,13 @@ export const useChat = () => {
   } = useChatStore()
 
   const useStreamingChat = useSettingsStore((state) => state.useStreamingChat)
- 
+
   const sendMessage = useCallback(
     async (message: string) => {
       // 从 store 中获取最新的设置值，避免闭包陷阱
       const enableToolCalls = useSettingsStore.getState().enableToolCalls
-      
+      const enableMemory = useSettingsStore.getState().enableMemory
+
       if (!sessionId || !message.trim()) return
 
       addMessage({
@@ -69,7 +70,8 @@ export const useChat = () => {
           sessionId,
           message,
           useStreamingChat,
-          enableToolCalls
+          enableToolCalls,
+          enableMemory
         )
 
         if (!response) {

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -12,7 +13,7 @@ from collections.abc import AsyncGenerator
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.chatbot_engine import chat_async, chat_async_stream
+from backend.chatbot_engine import MemoryManager, chat_async, chat_async_stream
 from backend.config import settings
 from backend.db.repositories import (
     MessageRepository,
@@ -32,6 +33,7 @@ async def chat_stream_generator(
     message: str,
     db: AsyncSession,
     enable_tools: bool = True,
+    enable_memory: bool = False,
 ) -> AsyncGenerator[str, None]:
     """Stream chat responses while emitting structured SSE events."""
     try:
@@ -42,8 +44,24 @@ async def chat_stream_generator(
             content=message,
         )
 
+        # Load conversation history if memory is enabled
+        chat_history = None
+        if enable_memory:
+            messages = await MessageRepository.get_by_session_id(
+                db, session_id, skip=0, limit=100
+            )
+            # Exclude the message we just created
+            if messages and messages[-1].content == message:
+                messages = messages[:-1]
+            chat_history = MemoryManager.load_history(messages)
+
         full_output = ""
-        async for chunk in chat_async_stream(message, enable_tools=enable_tools):
+        async for chunk in chat_async_stream(
+            message,
+            enable_tools=enable_tools,
+            enable_memory=enable_memory,
+            chat_history=chat_history,
+        ):
             if not isinstance(chunk, dict):
                 continue
 
@@ -133,6 +151,7 @@ async def chat_generator(
     message: str,
     db: AsyncSession,
     enable_tools: bool = True,
+    enable_memory: bool = False,
 ) -> ChatResponse:
     """Generate chat response for non-streaming endpoint.
 
@@ -152,7 +171,23 @@ async def chat_generator(
         content=message,
     )
 
-    result = await chat_async(message, enable_tools=enable_tools)
+    # Load conversation history if memory is enabled
+    chat_history = None
+    if enable_memory:
+        messages = await MessageRepository.get_by_session_id(
+            db, session_id, skip=0, limit=100
+        )
+        # Exclude the message we just created
+        if messages and messages[-1].content == message:
+            messages = messages[:-1]
+        chat_history = MemoryManager.load_history(messages)
+
+    result = await chat_async(
+        message,
+        enable_tools=enable_tools,
+        enable_memory=enable_memory,
+        chat_history=chat_history,
+    )
 
     # 如果 result["output"] 是 AIMessage 对象，提取其 content
     output = result["output"]
