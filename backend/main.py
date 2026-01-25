@@ -15,6 +15,7 @@ from backend.chat_service import (
     chat_stream_generator,
 )
 from backend.config import settings
+from backend.chatbot_engine import tools
 from backend.db.base import create_db_and_tables, dispose_db, get_db
 from backend.db.repositories import MessageRepository, SessionRepository
 from backend.models import (
@@ -59,6 +60,21 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+
+@app.get("/api/config")
+async def get_config():
+    """Get public configuration information.
+
+    This endpoint returns non-sensitive configuration settings
+    that can be safely exposed to the frontend.
+    """
+    return {
+        "modelName": settings.MODEL_NAME,
+        "temperature": settings.TEMPERATURE,
+        "maxIterations": settings.MAX_ITERATIONS,
+        "tools": [tool.name for tool in tools],
+    }
 
 
 @app.post(
