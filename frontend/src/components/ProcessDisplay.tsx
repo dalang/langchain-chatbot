@@ -76,7 +76,6 @@ const ProcessDisplay: React.FC<ProcessDisplayProps> = ({ message }) => {
   const isStepExpanded = (step: ToolStep, index: number): boolean => {
     if (step.status === 'running') return true
     if (step.status === 'failed') return true
-    if (step.status === 'cancelled') return true
     return !collapsedSteps[index]
   }
 
