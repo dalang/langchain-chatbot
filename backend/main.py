@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from backend.cancel_manager import cancel_manager
 from backend.chat_service import (
     chat_generator,
     chat_stream_generator,
@@ -150,6 +151,16 @@ async def clear_session(session_id: str, db: AsyncSession = Depends(get_db)):
 
     deleted_count = await MessageRepository.delete_by_session_id(db, session_id)
     return {"success": True, "deleted_count": deleted_count}
+
+
+@app.post("/api/sessions/{session_id}/cancel")
+async def cancel_session(session_id: str):
+    """Cancel an ongoing AI generation task for the specified session."""
+    success = cancel_manager.stop_session(session_id)
+    if success:
+        return {"success": True, "message": "Session cancelled"}
+    else:
+        return {"success": False, "message": "Session not found or not running"}
 
 
 @app.post("/api/stream-chat")

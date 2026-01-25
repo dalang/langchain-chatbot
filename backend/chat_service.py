@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -13,6 +13,7 @@ from collections.abc import AsyncGenerator
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.cancel_manager import cancel_manager
 from backend.chatbot_engine import MemoryManager, chat_async, chat_async_stream
 from backend.config import settings
 from backend.db.repositories import (
@@ -37,6 +38,8 @@ async def chat_stream_generator(
     enable_memory: bool = False,
 ) -> AsyncGenerator[str, None]:
     """Stream chat responses while emitting structured SSE events."""
+    stop_event = cancel_manager.get_stop_event(session_id)
+
     try:
         await MessageRepository.create(
             db,
@@ -63,6 +66,12 @@ async def chat_stream_generator(
             enable_memory=enable_memory,
             chat_history=chat_history,
         ):
+            if stop_event.is_set():
+                yield _format_event(
+                    {"type": "cancelled", "message": "Generation cancelled by user"}
+                )
+                break
+
             if not isinstance(chunk, dict):
                 continue
 
@@ -155,6 +164,8 @@ async def chat_stream_generator(
     except Exception as exc:
         error_event = {"type": "error", "message": str(exc)}
         yield _format_event(error_event)
+    finally:
+        cancel_manager.cleanup(session_id)
 
 
 async def chat_generator(

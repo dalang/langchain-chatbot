@@ -37,6 +37,10 @@ export const sessionApi = {
     await api.delete(`/sessions/${sessionId}/clear`)
   },
 
+  cancel: async (sessionId: string) => {
+    await api.post(`/sessions/${sessionId}/cancel`)
+  },
+
   getMessages: async (sessionId: string) => {
     const response = await api.get<Message[]>(
       `/sessions/${sessionId}/messages`
@@ -58,7 +62,8 @@ export const chatApi = {
     message: string,
     useStreaming: boolean = false,
     enableToolCalls: boolean = true,
-    enableMemory: boolean = false
+    enableMemory: boolean = false,
+    signal?: AbortSignal
   ): Promise<ReadableStream<Uint8Array> | ChatResponse> => {
     const endpoint = useStreaming ? '/api/stream-chat' : '/api/chat'
 
@@ -73,6 +78,7 @@ export const chatApi = {
           message,
           options: { enableToolCalls, enableMemory },
         }),
+        signal,
       })
       return response.body!
     } else {

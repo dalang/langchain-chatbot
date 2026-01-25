@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useRef, useState } from 'react'
 import useChatStore from '../store/chatStore'
 import useSettingsStore from '../store/settingsStore'
 import { SSEEvent, ToolStep, ChatResponse } from '../types'
@@ -22,7 +22,28 @@ export const useChat = () => {
     completeStreamingMessage,
   } = useChatStore()
 
+  const abortControllerRef = useRef<AbortController | null>(null)
+
   const useStreamingChat = useSettingsStore((state) => state.useStreamingChat)
+
+  const cancelMessage = useCallback(async () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+
+      if (sessionId) {
+        try {
+          await sessionApi.cancel(sessionId)
+          message.info('已取消生成')
+        } catch (error) {
+          console.error('Failed to cancel session:', error)
+        }
+      }
+
+      setLoading(false)
+      setCurrentStreamingMessage('')
+    }
+  }, [sessionId, setLoading, setCurrentStreamingMessage])
 
   const sendMessage = useCallback(
     async (message: string) => {
@@ -31,6 +52,12 @@ export const useChat = () => {
       const enableMemory = useSettingsStore.getState().enableMemory
 
       if (!sessionId || !message.trim()) return
+
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+
+      abortControllerRef.current = new AbortController()
 
       addMessage({
         id: Date.now(),
@@ -73,13 +100,16 @@ export const useChat = () => {
       setLoading(true)
       setCurrentStreamingMessage('')
 
+      const controller = abortControllerRef.current
+
       try {
         const response = await chatApi.send(
           sessionId,
           message,
           useStreamingChat,
           enableToolCalls,
-          enableMemory
+          enableMemory,
+          controller.signal
         )
 
         if (!response) {
@@ -196,9 +226,15 @@ export const useChat = () => {
                       console.error('Chat error:', data.message)
                       setLoading(false)
                       break
+                    case 'cancelled':
+                      console.log('Generation cancelled')
+                      setLoading(false)
+                      break
                   }
                 } catch (e) {
-                  console.error('Error parsing SSE data:', e)
+                  if ((e as Error).name !== 'AbortError') {
+                    console.error('Error parsing SSE data:', e)
+                  }
                 }
               }
             }
@@ -234,7 +270,9 @@ export const useChat = () => {
           setLoading(false)
         }
       } catch (error) {
-        console.error('Chat error:', error)
+        if ((error as Error).name !== 'AbortError') {
+          console.error('Chat error:', error)
+        }
         setLoading(false)
       }
     },
@@ -282,6 +320,7 @@ export const useChat = () => {
     isLoading,
     currentStreamingMessage,
     sendMessage,
+    cancelMessage,
     clearMessages,
     initializeSession,
   }

@@ -20,6 +20,7 @@ const ChatContainer: React.FC = () => {
     isLoading,
     currentStreamingMessage,
     sendMessage,
+    cancelMessage,
     clearMessages,
   } = useChat();
 
@@ -101,6 +102,7 @@ const ChatContainer: React.FC = () => {
             <InputArea
               onSend={sendMessage}
               onClear={clearMessages}
+              onCancel={cancelMessage}
               isLoading={isLoading}
             />
           </div>

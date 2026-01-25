@@ -1,14 +1,15 @@
 import React, { useState } from 'react'
 import { Input, Button, Flex, Space } from 'antd'
-import { SendOutlined, ClearOutlined } from '@ant-design/icons'
+import { SendOutlined, ClearOutlined, StopOutlined } from '@ant-design/icons'
 
 interface InputAreaProps {
   onSend: (message: string) => void
   onClear: () => void
+  onCancel: () => void
   isLoading: boolean
 }
 
-const InputArea: React.FC<InputAreaProps> = ({ onSend, onClear, isLoading }) => {
+const InputArea: React.FC<InputAreaProps> = ({ onSend, onClear, onCancel, isLoading }) => {
   const [inputValue, setInputValue] = useState('')
 
   const handleSend = () => {
@@ -48,6 +49,11 @@ const InputArea: React.FC<InputAreaProps> = ({ onSend, onClear, isLoading }) => 
           <Button icon={<ClearOutlined />} onClick={onClear} disabled={isLoading}>
             清空
           </Button>
+          {isLoading && (
+            <Button icon={<StopOutlined />} onClick={onCancel}>
+              停止
+            </Button>
+          )}
           <Button
             type="primary"
             icon={<SendOutlined />}
