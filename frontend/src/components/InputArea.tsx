@@ -49,29 +49,66 @@ const InputArea: React.FC<InputAreaProps> = ({ onSend, onClear, onCancel, isLoad
         flexShrink: 0,
       }}
     >
-      <Flex gap="small" align="flex-end">
-        <Input.TextArea
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onPressEnter={handleKeyPress}
-          placeholder="输入消息... (Shift+Enter 换行)"
-          autoSize={{ minRows: 1, maxRows: 4 }}
-          disabled={isLoading}
-          style={{ flex: 1 }}
-        />
-        <Space>
-          <Button icon={<ClearOutlined />} onClick={onClear} disabled={isLoading}>
-            清空
-          </Button>
-          <Button
-            type="primary"
-            icon={isLoading ? <StopSquare /> : <SendOutlined />}
-            onClick={handleButtonClick}
-          >
-            {isLoading ? '发送中' : '发送'}
-          </Button>
-        </Space>
-      </Flex>
+      <div>
+        <Flex gap="small" align="flex-end" className="input-area-flex">
+          <Input.TextArea
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onPressEnter={handleKeyPress}
+            placeholder="输入消息... (Shift+Enter 换行)"
+            autoSize={{ minRows: 1, maxRows: 4 }}
+            disabled={isLoading}
+            style={{ flex: 1 }}
+          />
+          <Space className="input-area-space">
+            <Button icon={<ClearOutlined />} onClick={onClear} disabled={isLoading}>
+              清空
+            </Button>
+            <Button
+              type="primary"
+              icon={isLoading ? <StopSquare /> : <SendOutlined />}
+              onClick={handleButtonClick}
+            >
+              {isLoading ? '发送中' : '发送'}
+            </Button>
+          </Space>
+        </Flex>
+        <style>{`
+          .input-area-flex {
+            display: flex;
+            flex-direction: row;
+            align-items: flex-end;
+            gap: 8px;
+          }
+          .input-area-flex > :first-child {
+            flex: 1;
+          }
+          .input-area-space {
+            display: flex;
+            flex-direction: row;
+            gap: 8px;
+          }
+          @media (max-width: 767px) {
+            .input-area-flex {
+              flex-direction: column;
+              align-items: stretch;
+              gap: 8px;
+            }
+            .input-area-flex > :first-child {
+              width: 100%;
+              flex: none;
+            }
+            .input-area-space {
+              flex-direction: column;
+              width: 100%;
+              gap: 8px;
+            }
+            .input-area-space .ant-btn {
+              width: 100%;
+            }
+          }
+        `}</style>
+      </div>
     </div>
   )
 }
