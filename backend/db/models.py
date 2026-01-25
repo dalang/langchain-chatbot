@@ -62,7 +62,7 @@ class Message(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False, index=True
     )
-    tokens_used: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tokens_used: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     model: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     session: Mapped["Session"] = relationship("Session", back_populates="messages")

@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useCallback, useMemo, memo, useTransition } from 'react'
 import { Bubble } from '@ant-design/x'
-import { Flex, Avatar, Button, Tooltip, message } from 'antd'
-import { UserOutlined, CopyOutlined } from '@ant-design/icons'
+import { Flex, Avatar, Button, Tooltip, message, Tag } from 'antd'
+import { UserOutlined, CopyOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import { XMarkdown } from '@ant-design/x-markdown'
 import { Message } from '../types'
 import ProcessDisplay from './ProcessDisplay'
+import useSettingsStore from '../store/settingsStore'
 
 interface MessageListProps {
   messages: Message[]
@@ -78,20 +79,17 @@ const MessageContent = memo(({ content, isStreaming }: { content: string; isStre
   )
 })
 
-const MessageItem = memo(({ message, aiStyles, userStyles, onCopy }: {
+const MessageItem = memo(({ message, aiStyles, userStyles, onCopy, showTokenUsage }: {
   message: Message
   aiStyles: any
   userStyles: any
   onCopy: (text: string) => void
+  showTokenUsage?: boolean
 }) => {
   const hasContent = message.content !== null && message.content !== undefined && message.content !== ''
 
   return (
-    <Flex
-      vertical
-      gap="small"
-      align={message.role === 'user' ? 'flex-end' : 'flex-start'}
-    >
+    <Flex vertical gap="small" align={message.role === 'user' ? 'flex-end' : 'flex-start'}>
       {message.role === 'assistant' && <ProcessDisplay key={`process-${message.id}`} message={message} />}
 
       {hasContent && (
@@ -111,6 +109,18 @@ const MessageItem = memo(({ message, aiStyles, userStyles, onCopy }: {
               }}
             >
               <MessageContent content={message.content || ''} isStreaming={false} />
+              {showTokenUsage && message.tokens_used && (
+                <Tag
+                  icon={<ThunderboltOutlined />}
+                  color="blue"
+                  style={{
+                    marginTop: '8px',
+                    fontSize: '12px',
+                  }}
+                >
+                  Prompt: {message.tokens_used.prompt_tokens} | Output: {message.tokens_used.completion_tokens} | Total: {message.tokens_used.total_tokens}
+                </Tag>
+              )}
             </div>
           ) : (
             <Bubble
@@ -154,6 +164,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, currentStreamingMes
   const scrollRef = useRef<HTMLDivElement>(null)
   const [, startTransition] = useTransition()
   const lastScrollHeightRef = useRef(0)
+  const { debugMode } = useSettingsStore()
 
   console.log('MessageList render:', { messagesCount: messages.length, hasStreaming: !!currentStreamingMessage })
 
@@ -231,15 +242,20 @@ const MessageList: React.FC<MessageListProps> = ({ messages, currentStreamingMes
       }}
     >
       <Flex vertical gap="small">
-        {messages.map((msg) => (
-          <MessageItem
-            key={msg.id}
-            message={msg}
-            aiStyles={aiStyles}
-            userStyles={userStyles}
-            onCopy={handleCopy}
-          />
-        ))}
+        {messages.map((msg) => {
+          const showTokenUsage = debugMode && msg.role === 'assistant' && !!msg.tokens_used
+
+          return (
+            <MessageItem
+              key={msg.id}
+              message={msg}
+              aiStyles={aiStyles}
+              userStyles={userStyles}
+              onCopy={handleCopy}
+              showTokenUsage={showTokenUsage}
+            />
+          )
+        })}
 
         {currentStreamingMessage && (
           <StreamingMessageItem

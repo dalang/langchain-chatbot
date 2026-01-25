@@ -31,7 +31,7 @@ class MessageCreate(BaseModel):
     content: Optional[str] = None
     tool_calls: Optional[Dict[str, Any]] = None
     model: Optional[str] = None
-    tokens_used: Optional[int] = None
+    tokens_used: Optional[Dict[str, int]] = None
 
 
 class MessageResponse(BaseModel):
@@ -42,7 +42,7 @@ class MessageResponse(BaseModel):
     tool_calls: Optional[Dict[str, Any]]
     created_at: datetime
     model: Optional[str]
-    tokens_used: Optional[int]
+    tokens_used: Optional[Dict[str, int]]
     tool_steps: List["ToolStepResponse"] = []
 
     class Config:

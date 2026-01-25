@@ -20,6 +20,7 @@ from backend.db.repositories import (
     SessionRepository,
     ToolStepRepository,
 )
+from backend.logger import get_last_token_usage
 from backend.models import ChatResponse, MessageResponse, ToolStepResponse
 
 __all__ = [
@@ -130,16 +131,26 @@ async def chat_stream_generator(
                 async for event in _stream_text(full_output):
                     yield event
 
+            tokens_used: Optional[dict[str, int]] = None
         if full_output:
+            token_usage_data = get_last_token_usage()
+            if token_usage_data:
+                tokens_used = {
+                    "prompt_tokens": token_usage_data.get("prompt_tokens", 0),
+                    "completion_tokens": token_usage_data.get("completion_tokens", 0),
+                    "total_tokens": token_usage_data.get("total_tokens", 0),
+                }
+
             await MessageRepository.create(
                 db,
                 session_id=session_id,
                 role="assistant",
                 content=full_output,
                 model=settings.MODEL_NAME,
+                tokens_used=tokens_used,
             )
 
-        yield _format_event({"type": "done"})
+        yield _format_event({"type": "done", "tokens_used": tokens_used})
 
     except Exception as exc:
         error_event = {"type": "error", "message": str(exc)}
@@ -194,12 +205,34 @@ async def chat_generator(
     if hasattr(output, "content"):
         output = output.content
 
+    token_usage_data = get_last_token_usage()
+    tokens_used: Optional[dict[str, int]] = None
+    if token_usage_data:
+        tokens_used = {
+            "prompt_tokens": token_usage_data.get("prompt_tokens", 0),
+            "completion_tokens": token_usage_data.get("completion_tokens", 0),
+            "total_tokens": token_usage_data.get("total_tokens", 0),
+        }
+    else:
+        if hasattr(result["output"], "response_metadata"):
+            metadata = result["output"].response_metadata
+            if "token_usage" in metadata:
+                token_usage_metadata = metadata["token_usage"]
+                tokens_used = {
+                    "prompt_tokens": token_usage_metadata.get("prompt_tokens", 0),
+                    "completion_tokens": token_usage_metadata.get(
+                        "completion_tokens", 0
+                    ),
+                    "total_tokens": token_usage_metadata.get("total_tokens", 0),
+                }
+
     assistant_message = await MessageRepository.create(
         db,
         session_id=session_id,
         role="assistant",
         content=output,
         model=settings.MODEL_NAME,
+        tokens_used=tokens_used,
     )
 
     if result.get("intermediate_steps"):
@@ -259,7 +292,7 @@ async def chat_generator(
     )
 
     return ChatResponse(
-        output=output,  # 使用已经提取的字符串版本
+        output=output,
         intermediate_steps=[],
         tool_steps=tool_steps,
         message=message_response,

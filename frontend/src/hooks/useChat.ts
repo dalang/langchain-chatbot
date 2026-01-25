@@ -43,7 +43,11 @@ export const useChat = () => {
         tool_calls: null,
         created_at: new Date().toISOString(),
         model: null,
-        tokens_used: null,
+        tokens_used: {
+          prompt_tokens: 0,
+          completion_tokens: 0,
+          total_tokens: 0,
+        },
         tool_steps: [],
       })
 
@@ -58,7 +62,11 @@ export const useChat = () => {
         tool_calls: null,
         created_at: new Date().toISOString(),
         model: null,
-        tokens_used: null,
+        tokens_used: {
+          prompt_tokens: 0,
+          completion_tokens: 0,
+          total_tokens: 0,
+        },
         tool_steps: [],
       })
 
@@ -177,6 +185,9 @@ export const useChat = () => {
                           thought_duration_ms: Date.now() - lastMsg.thought_start_time,
                         })
                       }
+                      if (data.tokens_used !== undefined) {
+                        updateLastAssistantMessage({ tokens_used: data.tokens_used })
+                      }
                       completeStreamingMessage()
                       setLoading(false)
                       break
@@ -213,6 +224,9 @@ export const useChat = () => {
           }
 
           updateLastAssistantMessage({ content: chatResponse.output })
+          if (chatResponse.message?.tokens_used) {
+            updateLastAssistantMessage({ tokens_used: chatResponse.message.tokens_used })
+          }
           updateLastAssistantMessage({
             thought_duration_ms: Date.now() - useChatStore.getState().messages[useChatStore.getState().messages.length - 1].thought_start_time!,
           })

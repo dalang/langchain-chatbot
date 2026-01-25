@@ -36,6 +36,7 @@ class LLMDetailedCallbackHandler(BaseCallbackHandler):
     def __init__(self, logger_name: str = "langchain.llm"):
         super().__init__()
         self.logger = logging.getLogger(logger_name)
+        self.last_token_usage = None
 
     def on_llm_start(
         self,
@@ -75,13 +76,46 @@ class LLMDetailedCallbackHandler(BaseCallbackHandler):
                     self.logger.info(f"Info: {generation.generation_info}")
                 self.logger.info("-" * 40)
 
-        # Log token usage if available
-        if response.llm_output and "token_usage" in response.llm_output:
-            token_usage = response.llm_output["token_usage"]
+        token_usage = None
+
+        for generations in response.generations:
+            for generation in generations:
+                if (
+                    generation.generation_info
+                    and "token_usage" in generation.generation_info
+                ):
+                    token_usage = generation.generation_info["token_usage"]
+                    break
+
+        if not token_usage and response.llm_output:
+            if "token_usage" in response.llm_output:
+                token_usage = response.llm_output["token_usage"]
+            elif (
+                "prompt_tokens" in response.llm_output
+                or "completion_tokens" in response.llm_output
+            ):
+                token_usage = {
+                    "prompt_tokens": response.llm_output.get("prompt_tokens", 0),
+                    "completion_tokens": response.llm_output.get(
+                        "completion_tokens", 0
+                    ),
+                    "total_tokens": response.llm_output.get("total_tokens", 0),
+                }
+
+        if token_usage:
             self.logger.info(f"Token usage: {token_usage}")
+            self.last_token_usage = token_usage
 
         if response.llm_output:
             self.logger.info(f"LLM output: {response.llm_output}")
+
+    def get_last_token_usage(self) -> Optional[Dict[str, int]]:
+        """Get token usage from last LLM invocation.
+
+        Returns:
+            Dictionary with 'prompt_tokens', 'completion_tokens', 'total_tokens' or None.
+        """
+        return self.last_token_usage
 
     def on_llm_error(
         self,
@@ -188,6 +222,9 @@ class LLMDetailedCallbackHandler(BaseCallbackHandler):
         self.logger.info(f"Log: {finish.log}")
 
 
+_llm_callback_handler_instance = None
+
+
 def get_llm_callback_handler() -> LLMDetailedCallbackHandler:
     """
     Get an instance of the detailed LLM callback handler.
@@ -195,4 +232,18 @@ def get_llm_callback_handler() -> LLMDetailedCallbackHandler:
     Returns:
         LLMDetailedCallbackHandler: Configured callback handler instance.
     """
-    return LLMDetailedCallbackHandler()
+    global _llm_callback_handler_instance
+    if _llm_callback_handler_instance is None:
+        _llm_callback_handler_instance = LLMDetailedCallbackHandler()
+    return _llm_callback_handler_instance
+
+
+def get_last_token_usage() -> Optional[Dict[str, int]]:
+    """
+    Get the token usage from the last LLM invocation.
+
+    Returns:
+        Dictionary with 'prompt_tokens', 'completion_tokens', 'total_tokens' or None.
+    """
+    handler = get_llm_callback_handler()
+    return handler.get_last_token_usage()

@@ -19,7 +19,11 @@ export interface Message {
   tool_calls: Record<string, any> | null
   created_at: string
   model: string | null
-  tokens_used: number | null
+  tokens_used: {
+    prompt_tokens: number
+    completion_tokens: number
+    total_tokens: number
+  } | null
   tool_steps: ToolStep[]
 }
 
@@ -54,6 +58,11 @@ export interface SSEEvent {
   result?: string
   duration_ms?: number
   message?: string
+  tokens_used?: {
+    prompt_tokens: number
+    completion_tokens: number
+    total_tokens: number
+  }
 }
 
 export interface ChatResponse {

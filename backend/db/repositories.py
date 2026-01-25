@@ -78,7 +78,7 @@ class MessageRepository:
         content: Optional[str] = None,
         tool_calls: Optional[Dict[str, Any]] = None,
         model: Optional[str] = None,
-        tokens_used: Optional[int] = None,
+        tokens_used: Optional[dict[str, int]] = None,
     ) -> Message:
         message = Message(
             session_id=session_id,
