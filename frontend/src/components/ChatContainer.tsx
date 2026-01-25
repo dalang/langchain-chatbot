@@ -2,13 +2,11 @@ import React, { useState } from "react";
 import { Card, Flex, Tag, theme } from "antd";
 import {
   SettingOutlined,
-  InfoCircleOutlined,
   BugOutlined,
 } from "@ant-design/icons";
 import MessageList from "./MessageList";
 import InputArea from "./InputArea";
 import SettingsModal from "./SettingsModal";
-import ConfigModal from "./ConfigModal";
 import DebugPanel from "./DebugPanel";
 import useChat from "../hooks/useChat";
 import useSettingsStore from "../store/settingsStore";
@@ -26,7 +24,6 @@ const ChatContainer: React.FC = () => {
 
   const { debugMode } = useSettingsStore();
   const [settingsVisible, setSettingsVisible] = useState(false);
-  const [configVisible, setConfigVisible] = useState(false);
 
   return (
     <>
@@ -44,18 +41,16 @@ const ChatContainer: React.FC = () => {
             <Flex align="center" gap={8}>
               <span>LangChain 智能助手</span>
               {debugMode && (
-                <Tag icon={<BugOutlined />} color="error" style={{ margin: 0 }}>
-                  DEBUG MODE
-                </Tag>
+                <Tag
+                  icon={<BugOutlined />}
+                  color="error"
+                  style={{ margin: 0 }}
+                ></Tag>
               )}
             </Flex>
           }
           extra={
             <Flex gap={12}>
-              <InfoCircleOutlined
-                onClick={() => setConfigVisible(true)}
-                style={{ cursor: "pointer", fontSize: 16 }}
-              />
               <SettingOutlined
                 onClick={() => setSettingsVisible(true)}
                 style={{ cursor: "pointer", fontSize: 16 }}
@@ -114,10 +109,6 @@ const ChatContainer: React.FC = () => {
       <SettingsModal
         visible={settingsVisible}
         onClose={() => setSettingsVisible(false)}
-      />
-      <ConfigModal
-        visible={configVisible}
-        onClose={() => setConfigVisible(false)}
       />
     </>
   );
