@@ -1,5 +1,3 @@
-from types import LambdaType
-
 from langchain_core.tools import tool
 
 

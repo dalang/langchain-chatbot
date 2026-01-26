@@ -4,8 +4,9 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     ZHIPUAI_API_KEY: str
     TAVILY_API_KEY: str
-    TAVILY_MAX_RESULTS: int = 3
     LANGSMITH_API_KEY: str = ""
+
+    TAVILY_MAX_RESULTS: int = 1
 
     DATABASE_URL: str = "sqlite+aiosqlite:///./data/chatbot.db"
 
@@ -22,8 +23,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "LangChain Chatbot API"
     DEBUG: bool = True
 
-    class Config:
-        env_file = ".env"
+    model_config = {"env_file": ".env"}
 
 
 settings = Settings()

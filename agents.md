@@ -426,71 +426,10 @@ npm run dev
 
 ---
 
-## 关键技术实现
+## 开发规范
 
-### FastAPI 流式响应（SSE）
-
-后端使用 `StreamingResponse` 实现服务器推送事件：
-
-```python
-from fastapi.responses import StreamingResponse
-import json
-
-async def chat_stream_generator(session_id: str, message: str):
-    # 生成 SSE 事件
-    yield f"data: {json.dumps({'type': 'message', 'content': '你好'})}\n\n"
-    yield f"data: {json.dumps({'type': 'done'})}\n\n"
-
-@app.post("/api/chat")
-async def chat(request: ChatRequest):
-    return StreamingResponse(
-        chat_stream_generator(request.sessionId, request.message),
-        media_type="text/event-stream"
-    )
-```
-
-### 前端 SSE 接收
-
-```typescript
-const eventSource = new EventSource('/api/chat?sessionId=xxx');
-
-eventSource.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  if (data.type === 'message') {
-    // 处理消息
-  } else if (data.type === 'done') {
-    eventSource.close();
-  }
-};
-```
-
-### Ant Design X 打字机效果
-
-```tsx
-import { Bubble } from '@ant-design/x';
-
-<Bubble
-  content={message}
-  typing={{
-    effect: 'typing',
-    step: 5,
-    interval: 50,
-  }}
-/>
-```
-
-### SQLite 异步操作
-
-```python
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-
-async def get_messages(session: AsyncSession, session_id: str):
-    result = await session.execute(
-        select(Message).where(Message.session_id == session_id)
-    )
-    return result.scalars().all()
-```
+### 后端
+- main.py 作为应用入口应该始终保持简洁，业务逻辑或者工具类封装在独立模块
 
 ---
 
@@ -498,7 +437,6 @@ async def get_messages(session: AsyncSession, session_id: str):
 
 ### 当前版本限制
 - ❌ 无用户认证
-- ❌ 单用户会话（无多租户）
 - ❌ 数据库无备份机制
 - ❌ 无日志系统
 - ❌ 无消息导出功能

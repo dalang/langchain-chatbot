@@ -1,33 +1,51 @@
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-from typing import Dict, Optional
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 import asyncio
 import json
-from collections.abc import AsyncGenerator
+from typing import AsyncGenerator, List, Optional
 
-from fastapi import HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from backend.cancel_manager import cancel_manager
-from backend.chatbot_engine import MemoryManager, chat_async, chat_async_stream
+from backend.agent.callback_handler import get_last_token_usage
+from backend.agent.engine import chat_async, chat_async_stream
 from backend.config import settings
 from backend.db.repositories import (
     MessageRepository,
     SessionRepository,
     ToolStepRepository,
 )
-from backend.logger import get_last_token_usage
-from backend.models import ChatResponse, MessageResponse, ToolStepResponse
+from backend.models import (
+    ChatResponse,
+    MessageResponse,
+    ToolStepResponse,
+)
+from backend.utils import MessageConverter, cancel_manager
+from fastapi import HTTPException, status
+from langchain_core.messages import BaseMessage
+from sqlalchemy.ext.asyncio import AsyncSession
 
 __all__ = [
     "chat_stream_generator",
     "chat_generator",
 ]
+
+
+class MemoryManager:
+    """Manages conversation memory by loading history from database.
+
+    This manager loads conversation history and converts database messages
+    to LangChain Message objects for use in prompts.
+    """
+
+    @staticmethod
+    def load_history(messages: List) -> List[BaseMessage]:
+        """Convert database messages to LangChain Message objects.
+
+        Args:
+            messages: List of database Message objects
+
+        Returns:
+            List of LangChain BaseMessage objects (HumanMessage, AIMessage)
+        """
+        return MessageConverter.to_langchain_messages(messages)
 
 
 async def chat_stream_generator(
