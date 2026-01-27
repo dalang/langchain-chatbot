@@ -1,11 +1,20 @@
 import axios from 'axios'
 import { Session, Message, ChatResponse } from '../types'
+import useChatStore from '../store/chatStore'
 
 const api = axios.create({
   baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
   },
+})
+
+api.interceptors.request.use((config) => {
+  const sessionId = useChatStore.getState().sessionId
+  if (sessionId) {
+    config.headers['X-Session-ID'] = sessionId
+  }
+  return config
 })
 
 export const sessionApi = {
@@ -49,11 +58,19 @@ export const sessionApi = {
   },
 }
 
+export interface SessionMetadata {
+  id: string
+  user_id: string
+  title: string | null
+  created_at: string | null
+}
+
 export interface ConfigInfo {
   modelName: string
   temperature: number
   maxIterations: number
   tools: string[]
+  session?: SessionMetadata
 }
 
 export const chatApi = {

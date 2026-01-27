@@ -3,6 +3,7 @@ import { Card, Typography, Space, Tag, Spin, Button, theme } from "antd";
 import { ReloadOutlined, CopyOutlined, CheckOutlined } from "@ant-design/icons";
 import { chatApi, ConfigInfo } from "../services/api";
 import useSettingsStore from "../store/settingsStore";
+import useChatStore from "../store/chatStore";
 
 const { Text } = Typography;
 
@@ -14,6 +15,7 @@ const DebugPanel: React.FC = () => {
 
   const { useStreamingChat, enableMemory, enableToolCalls, debugMode } =
     useSettingsStore();
+  const { sessionId } = useChatStore();
 
   const fetchConfig = async () => {
     setLoading(true);
@@ -31,7 +33,7 @@ const DebugPanel: React.FC = () => {
     if (debugMode) {
       fetchConfig();
     }
-  }, [debugMode]);
+  }, [debugMode, sessionId]);
 
   const handleCopy = () => {
     const debugInfo = {
@@ -41,6 +43,7 @@ const DebugPanel: React.FC = () => {
         enableMemory,
         enableToolCalls,
       },
+      sessionId,
       timestamp: new Date().toISOString(),
     };
     navigator.clipboard.writeText(JSON.stringify(debugInfo, null, 2));
@@ -105,6 +108,14 @@ const DebugPanel: React.FC = () => {
           </div>
         ) : config ? (
           <Space size={12} style={{ flex: 1, flexWrap: "wrap" }}>
+            <div style={inlineItemStyle}>
+              <Text type="secondary" style={inlineLabelStyle}>
+                Session ID:
+              </Text>
+              <Text code style={valueStyle}>
+                {config.session?.id || sessionId || "N/A"}
+              </Text>
+            </div>
             <div style={inlineItemStyle}>
               <Text type="secondary" style={inlineLabelStyle}>
                 Model:

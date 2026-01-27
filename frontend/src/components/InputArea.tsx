@@ -71,14 +71,16 @@ const InputArea: React.FC<InputAreaProps> = ({
               onClick={onClear}
               disabled={isLoading}
             >
-              清空
+              <span className="button-text">清空</span>
             </Button>
             <Button
               type="primary"
               icon={isLoading ? <StopSquare /> : <SendOutlined />}
               onClick={handleButtonClick}
             >
-              {isLoading ? "发送中" : "发送"}
+              <span className="button-text">
+                {isLoading ? "发送中" : "发送"}
+              </span>
             </Button>
           </Space>
         </Flex>
@@ -108,12 +110,22 @@ const InputArea: React.FC<InputAreaProps> = ({
               flex: 1;
             }
             .input-area-space {
-              flex-direction: column;
+              flex-direction: row;
               width: auto;
-              gap: 8px;
+              gap: 6px;
             }
             .input-area-space .ant-btn {
-              width: auto;
+              width: 36px;
+              min-width: 36px;
+              padding: 4px 8px;
+            }
+            .button-text {
+              display: none;
+            }
+          }
+          @media (max-width: 320px) {
+            .input-area-space {
+              flex-direction: column;
             }
           }
         `}</style>
