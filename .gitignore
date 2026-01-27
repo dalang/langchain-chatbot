@@ -1,6 +1,7 @@
-backend/data/chatbot.db
-backend/.env
-*.pyc
+ backend/data/chatbot.db
+ backend/.env
+ assets/
+ *.pyc
 __pycache__/
 *.so
 .Python

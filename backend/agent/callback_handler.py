@@ -36,6 +36,21 @@ class LLMDetailedCallbackHandler(BaseCallbackHandler):
         super().__init__()
         self.logger = logging.getLogger(logger_name)
         self.last_token_usage = None
+        self.current_session_id = None
+
+    def set_session_id(self, session_id: str):
+        """Set current session ID for logging context."""
+        self.current_session_id = session_id
+
+    def clear_session_id(self):
+        """Clear current session ID."""
+        self.current_session_id = None
+
+    def _get_log_prefix(self) -> str:
+        """Get log prefix with session ID if available."""
+        if self.current_session_id:
+            return f"[Session: {self.current_session_id}] "
+        return ""
 
     def on_llm_start(
         self,
@@ -44,36 +59,38 @@ class LLMDetailedCallbackHandler(BaseCallbackHandler):
         **kwargs: Any,
     ) -> None:
         """Run when LLM starts running."""
-        self.logger.info("=" * 80)
-        self.logger.info("LLM Start")
-        self.logger.info("=" * 80)
-        self.logger.debug(f"Serialized: {serialized}")
+        prefix = self._get_log_prefix()
+        self.logger.info(prefix + "=" * 80)
+        self.logger.info(prefix + "LLM Start")
+        self.logger.info(prefix + "=" * 80)
+        self.logger.debug(prefix + f"Serialized: {serialized}")
 
         for i, prompt in enumerate(prompts, 1):
-            self.logger.info(f"Prompt {i}:")
-            self.logger.info("-" * 40)
-            self.logger.info(prompt)
-            self.logger.info("-" * 40)
+            self.logger.info(prefix + f"Prompt {i}:")
+            self.logger.info(prefix + "-" * 40)
+            self.logger.info(prefix + prompt)
+            self.logger.info(prefix + "-" * 40)
 
     def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
         """Run on new LLM token. Only visible when log level is DEBUG."""
-        self.logger.debug(f"Token: {token}")
+        prefix = self._get_log_prefix()
+        self.logger.debug(prefix + f"Token: {token}")
 
     def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
         """Run when LLM ends running."""
-        self.logger.info("=" * 80)
-        self.logger.info("LLM End")
-        self.logger.info("=" * 80)
+        prefix = self._get_log_prefix()
+        self.logger.info(prefix + "=" * 80)
+        self.logger.info(prefix + "LLM End")
+        self.logger.info(prefix + "=" * 80)
 
-        # Log generations
         for i, generations in enumerate(response.generations, 1):
             for j, generation in enumerate(generations, 1):
-                self.logger.info(f"Generation {i}-{j}:")
-                self.logger.info("-" * 40)
-                self.logger.info(f"Text: {generation.text}")
+                self.logger.info(prefix + f"Generation {i}-{j}:")
+                self.logger.info(prefix + "-" * 40)
+                self.logger.info(prefix + f"Text: {generation.text}")
                 if generation.generation_info:
-                    self.logger.info(f"Info: {generation.generation_info}")
-                self.logger.info("-" * 40)
+                    self.logger.info(prefix + f"Info: {generation.generation_info}")
+                self.logger.info(prefix + "-" * 40)
 
         token_usage = None
 
@@ -102,11 +119,11 @@ class LLMDetailedCallbackHandler(BaseCallbackHandler):
                 }
 
         if token_usage:
-            self.logger.info(f"Token usage: {token_usage}")
+            self.logger.info(prefix + f"Token usage: {token_usage}")
             self.last_token_usage = token_usage
 
         if response.llm_output:
-            self.logger.info(f"LLM output: {response.llm_output}")
+            self.logger.info(prefix + f"LLM output: {response.llm_output}")
 
     def get_last_token_usage(self) -> Optional[Dict[str, int]]:
         """Get token usage from last LLM invocation.
@@ -122,10 +139,11 @@ class LLMDetailedCallbackHandler(BaseCallbackHandler):
         **kwargs: Any,
     ) -> None:
         """Run when LLM errors."""
-        self.logger.error("=" * 80)
-        self.logger.error("LLM Error")
-        self.logger.error("=" * 80)
-        self.logger.error(f"Error: {error}", exc_info=True)
+        prefix = self._get_log_prefix()
+        self.logger.error(prefix + "=" * 80)
+        self.logger.error(prefix + "LLM Error")
+        self.logger.error(prefix + "=" * 80)
+        self.logger.error(prefix + f"Error: {error}", exc_info=True)
 
     def on_chain_start(
         self,
@@ -134,17 +152,19 @@ class LLMDetailedCallbackHandler(BaseCallbackHandler):
         **kwargs: Any,
     ) -> None:
         """Run when chain starts running."""
-        self.logger.info("=" * 80)
-        self.logger.info(f"Chain Start: {serialized.get('name', 'unknown')}")
-        self.logger.info("=" * 80)
-        self.logger.debug(f"Inputs: {inputs}")
+        prefix = self._get_log_prefix()
+        self.logger.info(prefix + "=" * 80)
+        self.logger.info(prefix + f"Chain Start: {serialized.get('name', 'unknown')}")
+        self.logger.info(prefix + "=" * 80)
+        self.logger.debug(prefix + f"Inputs: {inputs}")
 
     def on_chain_end(self, outputs: Dict[str, Any], **kwargs: Any) -> None:
         """Run when chain ends running."""
-        self.logger.info("=" * 80)
-        self.logger.info("Chain End")
-        self.logger.info("=" * 80)
-        self.logger.debug(f"Outputs: {outputs}")
+        prefix = self._get_log_prefix()
+        self.logger.info(prefix + "=" * 80)
+        self.logger.info(prefix + "Chain End")
+        self.logger.info(prefix + "=" * 80)
+        self.logger.debug(prefix + f"Outputs: {outputs}")
 
     def on_chain_error(
         self,
@@ -152,10 +172,11 @@ class LLMDetailedCallbackHandler(BaseCallbackHandler):
         **kwargs: Any,
     ) -> None:
         """Run when chain errors."""
-        self.logger.error("=" * 80)
-        self.logger.error("Chain Error")
-        self.logger.error("=" * 80)
-        self.logger.error(f"Error: {error}", exc_info=True)
+        prefix = self._get_log_prefix()
+        self.logger.error(prefix + "=" * 80)
+        self.logger.error(prefix + "Chain Error")
+        self.logger.error(prefix + "=" * 80)
+        self.logger.error(prefix + f"Error: {error}", exc_info=True)
 
     def on_tool_start(
         self,
@@ -164,10 +185,11 @@ class LLMDetailedCallbackHandler(BaseCallbackHandler):
         **kwargs: Any,
     ) -> None:
         """Run when tool starts running."""
-        self.logger.info("=" * 80)
-        self.logger.info(f"Tool Start: {serialized.get('name', 'unknown')}")
-        self.logger.info("=" * 80)
-        self.logger.info(f"Input: {input_str}")
+        prefix = self._get_log_prefix()
+        self.logger.info(prefix + "=" * 80)
+        self.logger.info(prefix + f"Tool Start: {serialized.get('name', 'unknown')}")
+        self.logger.info(prefix + "=" * 80)
+        self.logger.info(prefix + f"Input: {input_str}")
 
     def on_tool_end(
         self,
@@ -177,10 +199,11 @@ class LLMDetailedCallbackHandler(BaseCallbackHandler):
         **kwargs: Any,
     ) -> None:
         """Run when tool ends running."""
-        self.logger.info("=" * 80)
-        self.logger.info("Tool End")
-        self.logger.info("=" * 80)
-        self.logger.info(f"Output: {output}")
+        prefix = self._get_log_prefix()
+        self.logger.info(prefix + "=" * 80)
+        self.logger.info(prefix + "Tool End")
+        self.logger.info(prefix + "=" * 80)
+        self.logger.info(prefix + f"Output: {output}")
 
     def on_tool_error(
         self,
@@ -188,10 +211,11 @@ class LLMDetailedCallbackHandler(BaseCallbackHandler):
         **kwargs: Any,
     ) -> None:
         """Run when tool errors."""
-        self.logger.error("=" * 80)
-        self.logger.error("Tool Error")
-        self.logger.error("=" * 80)
-        self.logger.error(f"Error: {error}", exc_info=True)
+        prefix = self._get_log_prefix()
+        self.logger.error(prefix + "=" * 80)
+        self.logger.error(prefix + "Tool Error")
+        self.logger.error(prefix + "=" * 80)
+        self.logger.error(prefix + f"Error: {error}", exc_info=True)
 
     def on_agent_action(
         self,
@@ -200,12 +224,13 @@ class LLMDetailedCallbackHandler(BaseCallbackHandler):
         **kwargs: Any,
     ) -> Any:
         """Run on agent action."""
-        self.logger.info("=" * 80)
-        self.logger.info("Agent Action")
-        self.logger.info("=" * 80)
-        self.logger.info(f"Tool: {action.tool}")
-        self.logger.info(f"Input: {action.tool_input}")
-        self.logger.info(f"Log: {action.log}")
+        prefix = self._get_log_prefix()
+        self.logger.info(prefix + "=" * 80)
+        self.logger.info(prefix + "Agent Action")
+        self.logger.info(prefix + "=" * 80)
+        self.logger.info(prefix + f"Tool: {action.tool}")
+        self.logger.info(prefix + f"Input: {action.tool_input}")
+        self.logger.info(prefix + f"Log: {action.log}")
 
     def on_agent_finish(
         self,
@@ -214,11 +239,12 @@ class LLMDetailedCallbackHandler(BaseCallbackHandler):
         **kwargs: Any,
     ) -> None:
         """Run on agent end."""
-        self.logger.info("=" * 80)
-        self.logger.info("Agent Finish")
-        self.logger.info("=" * 80)
-        self.logger.info(f"Output: {finish.return_values}")
-        self.logger.info(f"Log: {finish.log}")
+        prefix = self._get_log_prefix()
+        self.logger.info(prefix + "=" * 80)
+        self.logger.info(prefix + "Agent Finish")
+        self.logger.info(prefix + "=" * 80)
+        self.logger.info(prefix + f"Output: {finish.return_values}")
+        self.logger.info(prefix + f"Log: {finish.log}")
 
 
 _llm_callback_handler_instance = None
@@ -239,10 +265,33 @@ def get_llm_callback_handler() -> LLMDetailedCallbackHandler:
 
 def get_last_token_usage() -> Optional[Dict[str, int]]:
     """
-    Get the token usage from the last LLM invocation.
+    Get token usage from last LLM invocation.
 
     Returns:
         Dictionary with 'prompt_tokens', 'completion_tokens', 'total_tokens' or None.
     """
     handler = get_llm_callback_handler()
     return handler.get_last_token_usage()
+
+
+def set_session_id_for_logging(session_id: str):
+    """
+    Set session ID for the current request context.
+
+    This should be called before invoking the agent and cleared after completion.
+
+    Args:
+        session_id: Current session ID to include in logs.
+    """
+    handler = get_llm_callback_handler()
+    handler.set_session_id(session_id)
+
+
+def clear_session_id_for_logging():
+    """
+    Clear session ID after request completion.
+
+    This should be called after agent invocation completes.
+    """
+    handler = get_llm_callback_handler()
+    handler.clear_session_id()

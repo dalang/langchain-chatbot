@@ -4,7 +4,11 @@ import asyncio
 import json
 from typing import AsyncGenerator, List, Optional
 
-from backend.agent.callback_handler import get_last_token_usage
+from backend.agent.callback_handler import (
+    clear_session_id_for_logging,
+    get_last_token_usage,
+    set_session_id_for_logging,
+)
 from backend.agent.engine import chat_async, chat_async_stream
 from backend.config import settings
 from backend.db.repositories import (
@@ -57,6 +61,7 @@ async def chat_stream_generator(
 ) -> AsyncGenerator[str, None]:
     """Stream chat responses while emitting structured SSE events."""
     stop_event = cancel_manager.get_stop_event(session_id)
+    set_session_id_for_logging(session_id)
 
     try:
         await MessageRepository.create(
@@ -183,6 +188,7 @@ async def chat_stream_generator(
         error_event = {"type": "error", "message": str(exc)}
         yield _format_event(error_event)
     finally:
+        clear_session_id_for_logging()
         cancel_manager.cleanup(session_id)
 
 
@@ -195,10 +201,11 @@ async def chat_generator(
 ) -> ChatResponse:
     """Generate chat response for non-streaming endpoint.
 
-    Follows the same pattern as chat_stream_generator but returns
+    Follows same pattern as chat_stream_generator but returns
     a single ChatResponse instead of streaming SSE events.
     """
     stop_event = cancel_manager.get_stop_event(session_id)
+    set_session_id_for_logging(session_id)
 
     try:
         session = await SessionRepository.get_by_id(db, session_id)
@@ -336,6 +343,7 @@ async def chat_generator(
             detail="Request cancelled by user",
         )
     finally:
+        clear_session_id_for_logging()
         cancel_manager.cleanup(session_id)
 
 
