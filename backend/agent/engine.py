@@ -40,7 +40,10 @@ async def chat_async(
                 invoke_task.cancel()
             raise asyncio.CancelledError("Chat generation cancelled by user")
 
-        result = invoke_task.result()
+        if not invoke_task.done():
+            result = await invoke_task
+        else:
+            result = invoke_task.result()
     else:
         result = await agent_executor.ainvoke(inputs)
 
