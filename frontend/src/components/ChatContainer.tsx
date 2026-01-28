@@ -1,9 +1,6 @@
 import React, { useState } from "react";
 import { Card, Flex, Tag, theme } from "antd";
-import {
-  SettingOutlined,
-  BugOutlined,
-} from "@ant-design/icons";
+import { SettingOutlined, BugOutlined } from "@ant-design/icons";
 import MessageList from "./MessageList";
 import InputArea from "./InputArea";
 import SettingsModal from "./SettingsModal";
@@ -31,7 +28,7 @@ const ChatContainer: React.FC = () => {
         style={{
           display: "flex",
           flexDirection: "column",
-          height: "98dvh",
+          height: "95dvh",
           gap: 16,
           minHeight: 0,
         }}

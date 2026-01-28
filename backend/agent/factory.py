@@ -14,8 +14,9 @@ from backend.config import settings
 from backend.prompts import (
     custom_json_prompt,
     custom_json_prompt_with_memory,
-    no_tools_prompt,
-    no_tools_prompt_with_memory,
+    custom_no_tools_prompt,
+    custom_no_tools_prompt_with_memory,
+    react_prompt,
 )
 from langchain_classic.agents import (
     AgentExecutor,
@@ -25,33 +26,9 @@ from langchain_classic.agents import (
 from langchain_community.chat_models.zhipuai import ChatZhipuAI
 from langchain_core.callbacks import StreamingStdOutCallbackHandler
 from langchain_core.runnables import RunnableLambda
-from langsmith import Client
 
 os.environ["ZHIPUAI_API_KEY"] = settings.ZHIPUAI_API_KEY
 os.environ["TAVILY_API_KEY"] = settings.TAVILY_API_KEY
-
-
-try:
-    client = Client(api_key=settings.LANGSMITH_API_KEY)
-    # Pull different prompts for different agent types
-    # json_prompt = client.pull_prompt("hwchase17/react-chat-json")
-    react_prompt = client.pull_prompt("hwchase17/react")
-except Exception as e:
-    print(f"无法从 LangSmith 获取 prompt: {e}")
-    print("请确保已配置 LANGSMITH_API_KEY 并联网")
-    raise
-
-
-def simple_executor(input_dict: dict) -> dict:
-    """Simple executor for non-tool agents.
-
-    Args:
-        input_dict: Input dictionary with 'input' key
-
-    Returns:
-        Response dictionary with 'output' key
-    """
-    return input_dict
 
 
 class AgentFactory:
@@ -90,6 +67,12 @@ class AgentFactory:
             return AgentFactory._cache[key]
 
         tools = ToolRegistry.get_tools() if enable_tools else []
+        default_prompt_template = (
+            custom_no_tools_prompt_with_memory
+            if enable_memory
+            else custom_no_tools_prompt
+        )
+        agent = None
 
         if streaming:
             llm = ChatZhipuAI(
@@ -104,10 +87,7 @@ class AgentFactory:
             if enable_tools:
                 agent = create_react_agent(llm=llm, tools=tools, prompt=react_prompt)
             else:
-                prompt_template = (
-                    no_tools_prompt_with_memory if enable_memory else no_tools_prompt
-                )
-                agent = prompt_template | llm
+                agent = default_prompt_template | llm
         else:
             llm = ChatZhipuAI(
                 model=settings.MODEL_NAME,
@@ -121,6 +101,8 @@ class AgentFactory:
                     else custom_json_prompt
                 )
                 agent = create_json_chat_agent(llm, tools, prompt_template)
+            else:
+                agent = default_prompt_template | llm
 
         if enable_tools:
             agent_executor = AgentExecutor(
@@ -133,9 +115,16 @@ class AgentFactory:
                 callbacks=[get_llm_callback_handler()],
             )
         else:
-            agent_executor = RunnableLambda(
-                simple_executor,
-            )
+
+            async def simple_executor(inputs):
+                result = await agent.ainvoke(inputs)
+                return {
+                    "input": inputs.get("input", ""),
+                    "output": result,
+                    "intermediate_steps": [],
+                }
+
+            agent_executor = RunnableLambda(simple_executor)
 
         AgentFactory._cache[key] = agent_executor
         return agent_executor

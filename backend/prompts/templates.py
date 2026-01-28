@@ -1,6 +1,18 @@
 """Prompt templates for LangChain agents."""
 
+from backend.config import settings
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langsmith import Client
+
+try:
+    client = Client(api_key=settings.LANGSMITH_API_KEY)
+    # Pull different prompts for different agent types
+    json_prompt = client.pull_prompt("hwchase17/react-chat-json")
+    react_prompt = client.pull_prompt("hwchase17/react")
+except Exception as e:
+    print(f"无法从 LangSmith 获取 prompt: {e}")
+    print("请确保已配置 LANGSMITH_API_KEY 并联网")
+    raise
 
 custom_json_prompt = ChatPromptTemplate.from_messages(
     [
@@ -111,7 +123,7 @@ Here is the user's input (remember to respond with a markdown code snippet of a 
 )
 
 
-no_tools_prompt = ChatPromptTemplate.from_messages(
+custom_no_tools_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
@@ -128,7 +140,7 @@ IMPORTANT: You do not have access to any tools. Always provide a direct answer w
 )
 
 
-no_tools_prompt_with_memory = ChatPromptTemplate.from_messages(
+custom_no_tools_prompt_with_memory = ChatPromptTemplate.from_messages(
     [
         (
             "system",

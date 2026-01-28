@@ -1,5 +1,14 @@
 import React, { useEffect, useState } from "react";
-import { Card, Typography, Space, Tag, Spin, Button, theme } from "antd";
+import {
+  Card,
+  Typography,
+  Space,
+  Tag,
+  Spin,
+  Button,
+  theme,
+  Switch,
+} from "antd";
 import { ReloadOutlined, CopyOutlined, CheckOutlined } from "@ant-design/icons";
 import { chatApi, ConfigInfo } from "../services/api";
 import useSettingsStore from "../store/settingsStore";
@@ -140,43 +149,46 @@ const DebugPanel: React.FC = () => {
                 {config.maxIterations}
               </Text>
             </div>
-            <div style={inlineItemStyle}>
-              <Text type="secondary" style={inlineLabelStyle}>
-                Tools:
-              </Text>
-              <Space size={2}>
-                {config.tools.map((t) => (
-                  <Tag
-                    key={t}
-                    style={{
-                      margin: 0,
-                      fontSize: 9,
-                      padding: "0 4px",
-                      lineHeight: "16px",
-                    }}
-                  >
-                    {t}
-                  </Tag>
-                ))}
-              </Space>
-            </div>
-            <div style={inlineItemStyle}>
+            <div
+              style={{
+                ...inlineItemStyle,
+                gap: 8,
+                flexWrap: "nowrap",
+              }}
+            >
               <Text type="secondary" style={inlineLabelStyle}>
                 Stream:
               </Text>
-              <CompactStatusTag value={useStreamingChat} />
-            </div>
-            <div style={inlineItemStyle}>
+              <ReadonlySwitch checked={useStreamingChat} />
               <Text type="secondary" style={inlineLabelStyle}>
                 Mem:
               </Text>
-              <CompactStatusTag value={enableMemory} />
-            </div>
-            <div style={inlineItemStyle}>
+              <ReadonlySwitch checked={enableMemory} />
               <Text type="secondary" style={inlineLabelStyle}>
                 Tools:
               </Text>
-              <CompactStatusTag value={enableToolCalls} />
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                {!enableToolCalls && (
+                  <ReadonlySwitch checked={enableToolCalls} />
+                )}
+                {enableToolCalls && (
+                  <Space size={2}>
+                    {(config.tools ?? []).map((t) => (
+                      <Tag
+                        key={t}
+                        style={{
+                          margin: 0,
+                          fontSize: 9,
+                          padding: "0 4px",
+                          lineHeight: "16px",
+                        }}
+                      >
+                        {t}
+                      </Tag>
+                    ))}
+                  </Space>
+                )}
+              </div>
             </div>
           </Space>
         ) : (
@@ -216,20 +228,8 @@ const valueStyle: React.CSSProperties = {
   padding: "0 4px",
 };
 
-const CompactStatusTag: React.FC<{ value: boolean }> = ({ value }) => (
-  <Tag
-    color={value ? "success" : "default"}
-    style={{
-      margin: 0,
-      fontSize: 9,
-      padding: "0 4px",
-      lineHeight: "16px",
-      minWidth: 24,
-      textAlign: "center",
-    }}
-  >
-    {value ? "ON" : "OFF"}
-  </Tag>
+const ReadonlySwitch: React.FC<{ checked: boolean }> = ({ checked }) => (
+  <Switch size="small" checked={checked} disabled />
 );
 
 export default DebugPanel;
