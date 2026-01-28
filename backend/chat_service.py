@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from typing import AsyncGenerator, List, Optional
+from sqlalchemy import update
 
 from backend.agent.callback_handler import (
     clear_session_id_for_logging,
@@ -21,10 +22,12 @@ from backend.models import (
     MessageResponse,
     ToolStepResponse,
 )
+from backend.db.models import Message
 from backend.utils import MessageConverter, cancel_manager
 from fastapi import HTTPException, status
 from langchain_core.messages import BaseMessage
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime
 
 __all__ = [
     "chat_stream_generator",
@@ -82,6 +85,16 @@ async def chat_stream_generator(
                 messages = messages[:-1]
             chat_history = MemoryManager.load_history(messages)
 
+        assistant_message = await MessageRepository.create(
+            db,
+            session_id=session_id,
+            role="assistant",
+            content="",
+            model=settings.MODEL_NAME,
+        )
+
+        tool_actions: List[tuple] = []
+
         full_output = ""
         async for chunk in chat_async_stream(
             message,
@@ -109,20 +122,15 @@ async def chat_stream_generator(
                     if isinstance(tool_input, dict)
                     else {"input": tool_input}
                 )
+
+                tool_actions.append((tool_name, tool_input_normalized))
+
                 yield _format_event(
                     {
                         "type": "tool_start",
                         "tool": tool_name,
                         "input": tool_input_normalized,
                     }
-                )
-
-                await ToolStepRepository.create(
-                    db,
-                    message_id=0,
-                    step_number=1,
-                    tool_name=tool_name,
-                    tool_input=tool_input_normalized,
                 )
 
             for step in chunk.get("steps", []) or []:
@@ -160,12 +168,14 @@ async def chat_stream_generator(
                     full_output = output.content
                 else:
                     full_output = output
+
                 async for event in _stream_text(full_output):
                     yield event
 
-            tokens_used: Optional[dict[str, int]] = None
         if full_output:
             token_usage_data = get_last_token_usage()
+            tokens_used: Optional[dict[str, int]] = None
+
             if token_usage_data:
                 tokens_used = {
                     "prompt_tokens": token_usage_data.get("prompt_tokens", 0),
@@ -173,16 +183,28 @@ async def chat_stream_generator(
                     "total_tokens": token_usage_data.get("total_tokens", 0),
                 }
 
-            await MessageRepository.create(
-                db,
-                session_id=session_id,
-                role="assistant",
-                content=full_output,
-                model=settings.MODEL_NAME,
-                tokens_used=tokens_used,
+            await db.execute(
+                update(Message)
+                .where(Message.id == assistant_message.id)
+                .values(content=full_output, tokens_used=tokens_used)
             )
+            await db.flush()
 
-        yield _format_event({"type": "done", "tokens_used": tokens_used})
+            for i, (tool_name, tool_input) in enumerate(tool_actions, 1):
+                await ToolStepRepository.create(
+                    db,
+                    message_id=assistant_message.id,
+                    step_number=i,
+                    tool_name=tool_name,
+                    tool_input=tool_input,
+                )
+
+            await db.refresh(assistant_message)
+
+        done_event = _format_event(
+            {"type": "done", "tokens_used": assistant_message.tokens_used}
+        )
+        yield done_event
 
     except Exception as exc:
         error_event = {"type": "error", "message": str(exc)}
@@ -247,13 +269,70 @@ async def chat_generator(
 
         token_usage_data = get_last_token_usage()
         tokens_used: Optional[dict[str, int]] = None
+
         if token_usage_data:
             tokens_used = {
                 "prompt_tokens": token_usage_data.get("prompt_tokens", 0),
                 "completion_tokens": token_usage_data.get("completion_tokens", 0),
                 "total_tokens": token_usage_data.get("total_tokens", 0),
             }
-        else:
+
+        assistant_message = await MessageRepository.create(
+            db,
+            session_id=session_id,
+            role="assistant",
+            content=output,
+            model=settings.MODEL_NAME,
+            tokens_used=tokens_used,
+        )
+
+        await db.refresh(assistant_message)
+        tokens_used = assistant_message.tokens_used
+
+        if result.get("intermediate_steps"):
+            for i, step in enumerate(result["intermediate_steps"]):
+                if len(step) >= 2:
+                    action, observation = step[0], step[1]
+
+                    tool_input = (
+                        action.tool_input
+                        if isinstance(action.tool_input, dict)
+                        else {"input": action.tool_input}
+                    )
+
+                    tool_step = await ToolStepRepository.create(
+                        db,
+                        message_id=assistant_message.id,
+                        step_number=i + 1,
+                        tool_name=action.tool,
+                        tool_input=tool_input,
+                    )
+
+                    obs_str = str(observation)
+                    await ToolStepRepository.complete(
+                        db, tool_step_id=tool_step.id, output=obs_str, duration_ms=120
+                    )
+
+        tool_steps = []
+        for tool_step in await ToolStepRepository.get_by_message_id(
+            db, assistant_message.id
+        ):
+            tool_steps.append(
+                ToolStepResponse(
+                    id=tool_step.id,
+                    message_id=tool_step.message_id,
+                    step_number=tool_step.step_number,
+                    tool_name=tool_step.tool_name,
+                    tool_input=tool_step.tool_input,
+                    tool_output=tool_step.tool_output,
+                    tool_error=tool_step.tool_error,
+                    started_at=tool_step.started_at,
+                    completed_at=tool_step.completed_at,
+                    duration_ms=tool_step.duration_ms,
+                    status=tool_step.status,
+                )
+            )
+
             if hasattr(result["output"], "response_metadata"):
                 metadata = result["output"].response_metadata
                 if "token_usage" in metadata:
@@ -265,6 +344,17 @@ async def chat_generator(
                         ),
                         "total_tokens": token_usage_metadata.get("total_tokens", 0),
                     }
+                    logger.info(
+                        f"[INFO] Found token_usage in response_metadata: {tokens_used}"
+                    )
+
+                    from backend.agent.callback_handler import _token_usage_cache
+
+                    _token_usage_cache[session_id] = tokens_used
+                    logger.info(f"[INFO] Token usage cached for session {session_id}")
+                    logger.info(
+                        f"[INFO] Found token_usage in response_metadata: {tokens_used}"
+                    )
 
         assistant_message = await MessageRepository.create(
             db,
@@ -274,6 +364,9 @@ async def chat_generator(
             model=settings.MODEL_NAME,
             tokens_used=tokens_used,
         )
+
+        await db.refresh(assistant_message)
+        tokens_used = assistant_message.tokens_used
 
         if result.get("intermediate_steps"):
             for i, step in enumerate(result["intermediate_steps"]):

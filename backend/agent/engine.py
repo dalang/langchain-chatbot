@@ -21,7 +21,7 @@ async def chat_async(
         enable_memory=enable_memory,
     )
     inputs = {"input": question}
-    if enable_memory and chat_history:
+    if enable_memory:
         inputs["chat_history"] = chat_history
 
     if stop_event is not None:
@@ -59,7 +59,7 @@ async def chat_async_stream(
         enable_memory=enable_memory,
     )
     inputs = {"input": question}
-    if enable_memory and chat_history:
+    if enable_memory:
         inputs["chat_history"] = chat_history
 
     async for chunk in agent_executor.astream(inputs):

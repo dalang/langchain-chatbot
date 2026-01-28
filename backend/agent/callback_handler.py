@@ -5,6 +5,7 @@ This module sets up structured logging for the backend application and
 provides custom callbacks to capture detailed LLM invocation information.
 """
 
+import contextvars
 import logging
 import sys
 from typing import Any, Dict, List, Optional, Union
@@ -23,6 +24,12 @@ logging.basicConfig(
 # Create logger for this module
 logger = logging.getLogger(__name__)
 
+# Context variables for thread-safe, request-scoped state
+# These allow concurrent requests to have separate session_id and token_usage
+_current_session_id: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "_current_session_id", default=None
+)
+
 
 class LLMDetailedCallbackHandler(BaseCallbackHandler):
     """
@@ -36,20 +43,20 @@ class LLMDetailedCallbackHandler(BaseCallbackHandler):
         super().__init__()
         self.logger = logging.getLogger(logger_name)
         self.last_token_usage = None
-        self.current_session_id = None
 
     def set_session_id(self, session_id: str):
-        """Set current session ID for logging context."""
-        self.current_session_id = session_id
+        """Set current session ID for logging context using contextvar."""
+        _current_session_id.set(session_id)
 
     def clear_session_id(self):
-        """Clear current session ID."""
-        self.current_session_id = None
+        """Clear current session ID using contextvar."""
+        _current_session_id.set(None)
 
     def _get_log_prefix(self) -> str:
         """Get log prefix with session ID if available."""
-        if self.current_session_id:
-            return f"[Session: {self.current_session_id}] "
+        session_id = _current_session_id.get()
+        if session_id:
+            return f"[Session: {session_id}] "
         return ""
 
     def on_llm_start(
@@ -73,8 +80,9 @@ class LLMDetailedCallbackHandler(BaseCallbackHandler):
 
     def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
         """Run on new LLM token. Only visible when log level is DEBUG."""
-        prefix = self._get_log_prefix()
-        self.logger.debug(prefix + f"Token: {token}")
+        # prefix = self._get_log_prefix()
+        # self.logger.debug(prefix + f"Token: {token}")
+        pass
 
     def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
         """Run when LLM ends running."""
@@ -101,11 +109,18 @@ class LLMDetailedCallbackHandler(BaseCallbackHandler):
                     and "token_usage" in generation.generation_info
                 ):
                     token_usage = generation.generation_info["token_usage"]
+                    self.logger.info(
+                        prefix
+                        + f"[FOUND] Token usage in generation_info: {token_usage}"
+                    )
                     break
 
         if not token_usage and response.llm_output:
             if "token_usage" in response.llm_output:
                 token_usage = response.llm_output["token_usage"]
+                self.logger.info(
+                    prefix + f"[FOUND] Token usage in llm_output: {token_usage}"
+                )
             elif (
                 "prompt_tokens" in response.llm_output
                 or "completion_tokens" in response.llm_output
@@ -117,6 +132,9 @@ class LLMDetailedCallbackHandler(BaseCallbackHandler):
                     ),
                     "total_tokens": response.llm_output.get("total_tokens", 0),
                 }
+                self.logger.info(
+                    prefix + f"[CONSTRUCTED] Token usage from llm_output: {token_usage}"
+                )
 
         if token_usage:
             self.logger.info(prefix + f"Token usage: {token_usage}")
@@ -283,8 +301,7 @@ def set_session_id_for_logging(session_id: str):
     Args:
         session_id: Current session ID to include in logs.
     """
-    handler = get_llm_callback_handler()
-    handler.set_session_id(session_id)
+    _current_session_id.set(session_id)
 
 
 def clear_session_id_for_logging():
@@ -293,5 +310,4 @@ def clear_session_id_for_logging():
 
     This should be called after agent invocation completes.
     """
-    handler = get_llm_callback_handler()
-    handler.clear_session_id()
+    _current_session_id.set(None)
